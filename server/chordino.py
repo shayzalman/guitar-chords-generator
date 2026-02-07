@@ -2,8 +2,8 @@
 Utility functions for running the Chordino vamp plugin and post‑processing
 its output. Chordino is a popular plugin for estimating chord labels from
 audio using chroma features and NNLS chroma templates. These helpers
-invoke the tool via sonic‑annotator, parse its CSV output, and provide
-simple operations for transposition and simplification.
+use the Python vamp library to run the plugin, and provide simple operations
+for transposition and simplification.
 
 The functions defined here are intended to be imported by the FastAPI
 endpoint in ``app.py``. They do not depend on FastAPI and can be reused
@@ -14,47 +14,54 @@ from __future__ import annotations
 
 import os
 import re
-import subprocess
-import tempfile
-from typing import List, Dict, Optional, Any
+import wave
+from typing import List, Dict, Any
+
+import numpy as np
+import vamp
 
 
 def run_chordino(wav_path: str) -> List[Dict[str, Any]]:
-    """Run the Chordino vamp plugin via sonic‑annotator on the given WAV file.
+    """Run the Chordino vamp plugin on the given WAV file using Python vamp library.
 
     Returns a list of dictionaries with start time, end time, chord label
     and confidence (confidence may be None depending on plugin version).
 
-    Requires ``sonic‑annotator`` and the ``nnls‑chroma:chordino`` vamp
-    plugin to be installed. In a Docker environment this is typically
-    provided by the ``vamp‑plugin‑packages`` package.
+    Requires the ``nnls‑chroma`` vamp plugin to be installed in the system
+    VAMP_PATH (typically /usr/local/lib/vamp).
     """
-    # Output CSV file path in a temporary directory
-    out_csv = os.path.join(tempfile.gettempdir(), "chords_out.csv")
-    # Invoke sonic‑annotator to run the plugin and output CSV
-    subprocess.check_call([
-        "sonic-annotator",
-        "-d", "vamp:nnls-chroma:chordino:chords",
-        "-w", "csv",
-        "--csv-one-file", out_csv,
-        wav_path,
-    ])
-
+    # Set VAMP_PATH to ensure the plugin is found
+    os.environ['VAMP_PATH'] = '/usr/local/lib/vamp'
+    
+    # Read WAV file
+    with wave.open(wav_path, 'rb') as wf:
+        sample_rate = wf.getframerate()
+        n_channels = wf.getnchannels()
+        n_frames = wf.getnframes()
+        raw_data = wf.readframes(n_frames)
+    
+    # Convert to numpy array (mono, float)
+    audio = np.frombuffer(raw_data, dtype=np.int16).astype(np.float32) / 32768.0
+    if n_channels > 1:
+        audio = audio.reshape(-1, n_channels).mean(axis=1)
+    
+    # Run the chordino plugin (output="simplechord" returns chord labels)
+    results = vamp.collect(audio, sample_rate, "nnls-chroma:chordino", output="simplechord")
+    
     chords: List[Dict[str, Any]] = []
-    # Parse the CSV file; each row contains timestamp, duration and chord label
-    with open(out_csv, "r", encoding="utf-8", errors="ignore") as f:
-        for line in f:
-            parts = [p.strip().strip('"') for p in line.split(",")]
-            # Expect at least timestamp, duration and label
-            if len(parts) < 3:
-                continue
-            try:
-                start = float(parts[0])
-                dur = float(parts[1])
-                label = parts[2]
-            except Exception:
-                continue
-            chords.append({"start": start, "end": start + dur, "label": label, "confidence": None})
+    chord_list = results.get("list", [])
+    
+    for i, item in enumerate(chord_list):
+        start = float(item["timestamp"])
+        # Duration may be provided, or we calculate from next chord
+        if "duration" in item and item["duration"]:
+            dur = float(item["duration"])
+        elif i + 1 < len(chord_list):
+            dur = float(chord_list[i + 1]["timestamp"]) - start
+        else:
+            dur = 1.0  # Default duration for last chord
+        label = item.get("label", "N")
+        chords.append({"start": start, "end": start + dur, "label": label, "confidence": None})
 
     # Merge consecutive identical chords
     merged: List[Dict[str, Any]] = []

@@ -1,6 +1,6 @@
-FROM python:3.11-slim
+FROM --platform=linux/amd64 python:3.11-slim
 
-# System deps
+# System deps (no sonic-annotator - using Python vamp library instead)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     git \
@@ -15,7 +15,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     vamp-plugin-sdk \
     libvamp-hostsdk3v5 \
     libboost-all-dev \
-    sonic-annotator \
     && rm -rf /var/lib/apt/lists/*
 
 # --- Build and install NNLS-Chroma/Chordino Vamp plugin ---
@@ -29,7 +28,8 @@ RUN git clone --depth=1 https://github.com/c4dm/nnls-chroma.git /tmp/nnls-chroma
 
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install numpy first (required for vamp package build)
+RUN pip install --no-cache-dir numpy && pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]
