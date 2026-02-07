@@ -284,8 +284,18 @@ export default function Home() {
             style={{ width: "100%", minHeight: 160, padding: 10 }}
           />
         </div>
-        <div style={{ color: "#666", marginTop: 8 }}>
-          Tip: אם יש לך LRC, האקורדים ייושרו הרבה יותר טוב לליריקס.
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+          <div style={{ color: "#666" }}>
+            Tip: אם יש לך LRC, האקורדים ייושרו הרבה יותר טוב לליריקס.
+          </div>
+          <a 
+            href="https://www.lyricsify.com/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{ fontSize: 14, color: "#1976D2", textDecoration: "none" }}
+          >
+            Search for LRC lyrics on Lyricsify 🔍
+          </a>
         </div>
       </div>
 
@@ -570,13 +580,13 @@ export default function Home() {
             // Get beat info for bar lines
             const downbeats = result.beat_info?.downbeats || [];
             const beats = result.beat_info?.beats || [];
-            // Create time markers every 5 seconds
+            // Create time markers every 2 seconds
             const timeMarkers = [];
-            for (let t = 0; t <= totalDur; t += 5) {
+            for (let t = 0; t <= totalDur; t += 2) {
               timeMarkers.push(t);
             }
-            // Group chords into rows (e.g., 30 seconds per row)
-            const rowDuration = 30;
+            // Group chords into rows (e.g., 10 seconds per row)
+            const rowDuration = 10;
             const numRows = Math.ceil(totalDur / rowDuration);
             const rows = [];
             for (let r = 0; r < numRows; r++) {
@@ -646,6 +656,7 @@ export default function Home() {
                                   fontSize: 10,
                                   color: "#999",
                                   transform: "translateX(-50%)",
+                                  zIndex: 20,
                                 }}
                               >
                                 {formatTime(t)}
@@ -764,7 +775,7 @@ export default function Home() {
                             >
                               <span
                                 style={{
-                                  fontSize: width > 8 ? 16 : width > 4 ? 12 : 10,
+                                  fontSize: width > 10 ? 12 : width > 4 ? 10 : 7,
                                   fontWeight: 700,
                                   color: isN ? "#999" : "#fff",
                                   textShadow: isN ? "none" : "0 1px 2px rgba(0,0,0,0.3)",
@@ -790,7 +801,7 @@ export default function Home() {
                               bottom: 0,
                               width: 3,
                               background: "#f44336",
-                              zIndex: 10,
+                              zIndex: 15,
                               boxShadow: "0 0 4px rgba(244,67,54,0.5)",
                             }}
                           />

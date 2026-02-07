@@ -27,7 +27,7 @@ def detect_beats(wav_path: str) -> Dict[str, Any]:
         - time_signature: Estimated time signature (default 4/4)
     """
     # Load audio file
-    y, sr = librosa.load(wav_path, sr=22050, mono=True)
+    y, sr = librosa.load(wav_path, sr=None, mono=True)
     
     # Detect tempo and beat frames
     tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
