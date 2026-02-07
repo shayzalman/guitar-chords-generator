@@ -22,12 +22,32 @@ export default function Home() {
 
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   // Audio playback state
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+
+  // Auto-scroll to active row
+  useEffect(() => {
+    // Only scroll if we are playing and have results
+    if (!isPlaying || !result) return;
+
+    // Find current row index (rows are 10 seconds each)
+    const rowDuration = 10;
+    const currentRowIdx = Math.floor(currentTime / rowDuration);
+    
+    // We scroll only when the row index changes
+    const rowEl = document.getElementById(`chord-row-${currentRowIdx}`);
+    if (rowEl) {
+      rowEl.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [Math.floor(currentTime / 10), isPlaying, !!result]);
 
   // Create object URL for audio playback when file is selected
   useEffect(() => {
@@ -111,6 +131,46 @@ export default function Home() {
     }
   }
 
+  /**
+   * Extract audio from YouTube and analyze.
+   */
+  async function analyzeYoutube() {
+    if (!ytUrl) return;
+    setLoading(true);
+    setResult(null);
+
+    const fd = new FormData();
+    fd.append("youtube_url", ytUrl);
+    fd.append("transpose", String(transpose));
+    fd.append("mode", mode);
+    fd.append("lyrics_text", lyricsText);
+    fd.append("lrc_text", lrcText);
+
+    try {
+      const r = await fetch("http://localhost:4433/api/analyze-youtube", {
+        method: "POST",
+        body: fd,
+      });
+      const j = await r.json();
+      if (j.error) {
+        alert(j.error);
+        return;
+      }
+      setResult(j);
+      if (j.meta?.audio_url) {
+        // Handle both relative and absolute URLs
+        const finalAudioUrl = j.meta.audio_url.startsWith("http") 
+          ? j.meta.audio_url 
+          : `http://localhost:4433${j.meta.audio_url}`;
+        setAudioUrl(finalAudioUrl);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   // Playback controls
   function togglePlay() {
     const audioEl = audioRef.current;
@@ -182,9 +242,18 @@ export default function Home() {
             placeholder="https://www.youtube.com/watch?v=..."
             style={{ width: "100%", padding: 10, boxSizing: "border-box" }}
           />
-          <button onClick={fetchYoutubeMeta} style={{ marginTop: 10 }}>
-            Load video info
-          </button>
+          <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+            <button onClick={fetchYoutubeMeta}>
+              Load video info
+            </button>
+            <button 
+              onClick={analyzeYoutube} 
+              disabled={!ytUrl || loading}
+              style={{ background: "#f44336", color: "white", border: "none", padding: "8px 16px", borderRadius: 4, cursor: "pointer" }}
+            >
+              {loading && !audio ? "Downloading & Analyzing..." : "Extract & Analyze Audio"}
+            </button>
+          </div>
 
           {meta && (
             <div style={{ marginTop: 12 }}>
@@ -500,7 +569,7 @@ export default function Home() {
               );
             })}
 
-            {result.chords.map((chord, i) => {
+            {result.chords?.map((chord, i) => {
               const totalDuration = duration || result.chords[result.chords.length - 1]?.end || 1;
               const left = (chord.start / totalDuration) * 100;
               const width = ((chord.end - chord.start) / totalDuration) * 100;
@@ -626,12 +695,14 @@ export default function Home() {
                   return (
                     <div
                       key={rowIdx}
+                      id={`chord-row-${rowIdx}`}
                       style={{
                         marginBottom: 24,
                         padding: 12,
                         background: isCurrentRow ? "#f0f7ff" : "#fafafa",
                         borderRadius: 8,
                         border: isCurrentRow ? "2px solid #2196F3" : "1px solid #e0e0e0",
+                        transition: "all 0.3s ease",
                       }}
                     >
                       {/* Time markers row */}

@@ -6,3 +6,4 @@ numpy
 vamp
 librosa
 scipy
+yt-dlp

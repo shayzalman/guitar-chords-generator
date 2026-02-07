@@ -31,5 +31,8 @@ COPY requirements.txt .
 # Install numpy first (required for vamp package build)
 RUN pip install --no-cache-dir numpy && pip install --no-cache-dir -r requirements.txt
 
+# Create downloads directory
+RUN mkdir -p /app/downloads && chmod 777 /app/downloads
+
 COPY . .
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]
