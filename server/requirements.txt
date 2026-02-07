@@ -4,3 +4,5 @@ python-multipart
 pydantic
 numpy
 vamp
+librosa
+scipy

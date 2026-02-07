@@ -389,9 +389,50 @@ export default function Home() {
             borderRadius: 12,
           }}
         >
+          {/* Beat Info Display */}
+          {result.beat_info && (
+            <div
+              style={{
+                display: "flex",
+                gap: 24,
+                marginBottom: 16,
+                padding: 12,
+                background: "#f0f7ff",
+                borderRadius: 8,
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 14, color: "#666" }}>Tempo:</span>
+                <span style={{ fontSize: 24, fontWeight: 700, color: "#1976D2" }}>
+                  {result.beat_info.tempo} BPM
+                </span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 14, color: "#666" }}>Time Signature:</span>
+                <span style={{ fontSize: 24, fontWeight: 700, color: "#1976D2" }}>
+                  {result.beat_info.time_signature?.numerator || 4}/{result.beat_info.time_signature?.denominator || 4}
+                </span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 14, color: "#666" }}>Bars:</span>
+                <span style={{ fontSize: 18, fontWeight: 600, color: "#333" }}>
+                  {result.beat_info.downbeats?.length || 0}
+                </span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 14, color: "#666" }}>Beats:</span>
+                <span style={{ fontSize: 18, fontWeight: 600, color: "#333" }}>
+                  {result.beat_info.beats?.length || 0}
+                </span>
+              </div>
+            </div>
+          )}
+
           <h3>Chord Timeline</h3>
 
-          {/* Visual chord timeline */}
+          {/* Visual chord timeline with bar lines */}
           <div
             style={{
               position: "relative",
@@ -402,6 +443,53 @@ export default function Home() {
               overflow: "hidden",
             }}
           >
+            {/* Bar lines (downbeats) */}
+            {result.beat_info?.downbeats?.map((downbeat, i) => {
+              const totalDuration = duration || result.chords[result.chords.length - 1]?.end || 1;
+              const left = (downbeat / totalDuration) * 100;
+              return (
+                <div
+                  key={`bar-${i}`}
+                  style={{
+                    position: "absolute",
+                    left: `${left}%`,
+                    top: 0,
+                    bottom: 0,
+                    width: 2,
+                    background: "rgba(0, 0, 0, 0.6)",
+                    zIndex: 5,
+                    pointerEvents: "none",
+                  }}
+                  title={`Bar ${i + 1} (${formatTime(downbeat)})`}
+                />
+              );
+            })}
+
+            {/* Beat markers (smaller ticks) */}
+            {result.beat_info?.beats?.map((beat, i) => {
+              const totalDuration = duration || result.chords[result.chords.length - 1]?.end || 1;
+              const left = (beat / totalDuration) * 100;
+              const isDownbeat = result.beat_info?.downbeats?.some(
+                (db) => Math.abs(db - beat) < 0.05
+              );
+              if (isDownbeat) return null; // Skip downbeats, they have their own markers
+              return (
+                <div
+                  key={`beat-${i}`}
+                  style={{
+                    position: "absolute",
+                    left: `${left}%`,
+                    top: 0,
+                    height: "30%",
+                    width: 1,
+                    background: "rgba(0, 0, 0, 0.3)",
+                    zIndex: 4,
+                    pointerEvents: "none",
+                  }}
+                />
+              );
+            })}
+
             {result.chords.map((chord, i) => {
               const totalDuration = duration || result.chords[result.chords.length - 1]?.end || 1;
               const left = (chord.start / totalDuration) * 100;
@@ -433,6 +521,7 @@ export default function Home() {
                     justifyContent: "center",
                     cursor: "pointer",
                     transition: "background 0.1s",
+                    zIndex: 1,
                   }}
                   title={`${chord.label} (${formatTime(chord.start)} - ${formatTime(chord.end)})`}
                 >
@@ -478,6 +567,9 @@ export default function Home() {
           {/* Timeline Grid - Chords aligned to timestamps */}
           {(() => {
             const totalDur = duration || result.chords[result.chords.length - 1]?.end || 1;
+            // Get beat info for bar lines
+            const downbeats = result.beat_info?.downbeats || [];
+            const beats = result.beat_info?.beats || [];
             // Create time markers every 5 seconds
             const timeMarkers = [];
             for (let t = 0; t <= totalDur; t += 5) {
@@ -493,6 +585,14 @@ export default function Home() {
               const rowChords = result.chords.filter(
                 (c) => c.start < rowEnd && c.end > rowStart
               );
+              // Get downbeats (bar lines) for this row
+              const rowDownbeats = downbeats.filter(
+                (db) => db >= rowStart && db < rowEnd
+              );
+              // Get beats for this row
+              const rowBeats = beats.filter(
+                (b) => b >= rowStart && b < rowEnd
+              );
               // Get lyrics for this row if LRC is available
               const rowLyrics = result.aligned_lrc
                 ? result.aligned_lrc.filter(
@@ -504,7 +604,7 @@ export default function Home() {
                     }
                   )
                 : [];
-              rows.push({ rowStart, rowEnd, chords: rowChords, lyrics: rowLyrics });
+              rows.push({ rowStart, rowEnd, chords: rowChords, lyrics: rowLyrics, downbeats: rowDownbeats, beats: rowBeats });
             }
 
             return (
@@ -565,6 +665,67 @@ export default function Home() {
                           marginBottom: 8,
                         }}
                       >
+                        {/* Bar lines (downbeats) */}
+                        {row.downbeats.map((db, i) => {
+                          const left = ((db - row.rowStart) / rowWidth) * 100;
+                          // Find bar number
+                          const barNum = downbeats.indexOf(db) + 1;
+                          return (
+                            <div
+                              key={`bar-${i}`}
+                              style={{
+                                position: "absolute",
+                                left: `${left}%`,
+                                top: 0,
+                                bottom: 0,
+                                width: 2,
+                                background: "#333",
+                                zIndex: 6,
+                                pointerEvents: "none",
+                              }}
+                              title={`Bar ${barNum}`}
+                            >
+                              {/* Bar number label */}
+                              <span
+                                style={{
+                                  position: "absolute",
+                                  top: -16,
+                                  left: 2,
+                                  fontSize: 9,
+                                  color: "#666",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                {barNum}
+                              </span>
+                            </div>
+                          );
+                        })}
+
+                        {/* Beat markers (smaller ticks) */}
+                        {row.beats.map((beat, i) => {
+                          const left = ((beat - row.rowStart) / rowWidth) * 100;
+                          const isDownbeat = row.downbeats.some(
+                            (db) => Math.abs(db - beat) < 0.05
+                          );
+                          if (isDownbeat) return null;
+                          return (
+                            <div
+                              key={`beat-${i}`}
+                              style={{
+                                position: "absolute",
+                                left: `${left}%`,
+                                top: 0,
+                                height: "25%",
+                                width: 1,
+                                background: "rgba(0, 0, 0, 0.25)",
+                                zIndex: 5,
+                                pointerEvents: "none",
+                              }}
+                            />
+                          );
+                        })}
+
                         {row.chords.map((chord, i) => {
                           // Clamp chord to row boundaries
                           const chordStart = Math.max(chord.start, row.rowStart);

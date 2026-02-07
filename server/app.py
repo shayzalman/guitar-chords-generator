@@ -5,6 +5,7 @@ import os
 import subprocess
 from chordino import run_chordino, postprocess_chords
 from lyrics_align import align_chords_to_lrc, build_chord_sheet_lines
+from beat_detection import detect_beats
 
 
 app = FastAPI()
@@ -56,6 +57,9 @@ async def analyze(
         chords = run_chordino(wav_path)  # list of {start, end, label}
         chords = postprocess_chords(chords, transpose=transpose, mode=mode)
 
+        # Detect beats, tempo, and time signature
+        beat_info = detect_beats(wav_path)
+
         # Align chords to LRC if provided
         aligned = None
         if lrc_text.strip():
@@ -79,4 +83,5 @@ async def analyze(
             "chords": chords,
             "aligned_lrc": aligned,
             "sheet_lines": sheet_lines,
+            "beat_info": beat_info,
         }
