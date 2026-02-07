@@ -472,68 +472,291 @@ export default function Home() {
             )}
           </div>
 
-          {/* Chord sheet with lyrics */}
+          {/* Chord Sheet - Timeline Grid Display */}
           <h3>Chord Sheet</h3>
-          <div
-            style={{
-              fontFamily:
-                "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-              lineHeight: 1.6,
-            }}
-          >
-            {result.aligned_lrc ? (
-              // LRC-aligned display with timing
-              result.aligned_lrc.map((line, i) => {
-                const isCurrentLine =
-                  i < result.aligned_lrc.length - 1
-                    ? currentTime >= line.t && currentTime < result.aligned_lrc[i + 1].t
-                    : currentTime >= line.t;
+          
+          {/* Timeline Grid - Chords aligned to timestamps */}
+          {(() => {
+            const totalDur = duration || result.chords[result.chords.length - 1]?.end || 1;
+            // Create time markers every 5 seconds
+            const timeMarkers = [];
+            for (let t = 0; t <= totalDur; t += 5) {
+              timeMarkers.push(t);
+            }
+            // Group chords into rows (e.g., 30 seconds per row)
+            const rowDuration = 30;
+            const numRows = Math.ceil(totalDur / rowDuration);
+            const rows = [];
+            for (let r = 0; r < numRows; r++) {
+              const rowStart = r * rowDuration;
+              const rowEnd = Math.min((r + 1) * rowDuration, totalDur);
+              const rowChords = result.chords.filter(
+                (c) => c.start < rowEnd && c.end > rowStart
+              );
+              // Get lyrics for this row if LRC is available
+              const rowLyrics = result.aligned_lrc
+                ? result.aligned_lrc.filter(
+                    (l, i) => {
+                      const nextT = i < result.aligned_lrc.length - 1 
+                        ? result.aligned_lrc[i + 1].t 
+                        : totalDur;
+                      return l.t < rowEnd && nextT > rowStart;
+                    }
+                  )
+                : [];
+              rows.push({ rowStart, rowEnd, chords: rowChords, lyrics: rowLyrics });
+            }
 
-                return (
-                  <div
-                    key={i}
-                    onClick={() => {
-                      if (audioRef.current) {
-                        audioRef.current.currentTime = line.t;
-                      }
-                    }}
-                    style={{
-                      marginBottom: 16,
-                      padding: "8px 12px",
-                      borderRadius: 8,
-                      background: isCurrentLine ? "#e3f2fd" : "transparent",
-                      cursor: "pointer",
-                      transition: "background 0.2s",
-                    }}
-                  >
+            return (
+              <div style={{ marginBottom: 24 }}>
+                {rows.map((row, rowIdx) => {
+                  const rowWidth = row.rowEnd - row.rowStart;
+                  const isCurrentRow = currentTime >= row.rowStart && currentTime < row.rowEnd;
+                  
+                  return (
                     <div
+                      key={rowIdx}
                       style={{
-                        fontWeight: 700,
-                        color: isCurrentLine ? "#1976D2" : "#333",
-                        fontSize: 18,
+                        marginBottom: 24,
+                        padding: 12,
+                        background: isCurrentRow ? "#f0f7ff" : "#fafafa",
+                        borderRadius: 8,
+                        border: isCurrentRow ? "2px solid #2196F3" : "1px solid #e0e0e0",
                       }}
                     >
-                      {line.chord}
+                      {/* Time markers row */}
+                      <div
+                        style={{
+                          position: "relative",
+                          height: 20,
+                          marginBottom: 4,
+                          borderBottom: "1px solid #ddd",
+                        }}
+                      >
+                        {timeMarkers
+                          .filter((t) => t >= row.rowStart && t <= row.rowEnd)
+                          .map((t) => {
+                            const left = ((t - row.rowStart) / rowWidth) * 100;
+                            return (
+                              <div
+                                key={t}
+                                style={{
+                                  position: "absolute",
+                                  left: `${left}%`,
+                                  fontSize: 10,
+                                  color: "#999",
+                                  transform: "translateX(-50%)",
+                                }}
+                              >
+                                {formatTime(t)}
+                              </div>
+                            );
+                          })}
+                      </div>
+
+                      {/* Chord blocks row */}
+                      <div
+                        style={{
+                          position: "relative",
+                          height: 48,
+                          background: "#fff",
+                          borderRadius: 4,
+                          overflow: "hidden",
+                          marginBottom: 8,
+                        }}
+                      >
+                        {row.chords.map((chord, i) => {
+                          // Clamp chord to row boundaries
+                          const chordStart = Math.max(chord.start, row.rowStart);
+                          const chordEnd = Math.min(chord.end, row.rowEnd);
+                          const left = ((chordStart - row.rowStart) / rowWidth) * 100;
+                          const width = ((chordEnd - chordStart) / rowWidth) * 100;
+                          const isActive = currentTime >= chord.start && currentTime < chord.end;
+                          const isN = chord.label === "N";
+
+                          return (
+                            <div
+                              key={i}
+                              onClick={() => {
+                                if (audioRef.current) {
+                                  audioRef.current.currentTime = chord.start;
+                                }
+                              }}
+                              style={{
+                                position: "absolute",
+                                left: `${left}%`,
+                                width: `${Math.max(width, 1)}%`,
+                                height: "100%",
+                                background: isN
+                                  ? "#f5f5f5"
+                                  : isActive
+                                  ? "#4CAF50"
+                                  : "#2196F3",
+                                borderRight: "1px solid #fff",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                cursor: "pointer",
+                                transition: "background 0.15s",
+                              }}
+                              title={`${chord.label} (${formatTime(chord.start)} - ${formatTime(chord.end)})`}
+                            >
+                              <span
+                                style={{
+                                  fontSize: width > 8 ? 16 : width > 4 ? 12 : 10,
+                                  fontWeight: 700,
+                                  color: isN ? "#999" : "#fff",
+                                  textShadow: isN ? "none" : "0 1px 2px rgba(0,0,0,0.3)",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                  padding: "0 4px",
+                                }}
+                              >
+                                {chord.label}
+                              </span>
+                            </div>
+                          );
+                        })}
+
+                        {/* Playhead for current row */}
+                        {isCurrentRow && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              left: `${((currentTime - row.rowStart) / rowWidth) * 100}%`,
+                              top: 0,
+                              bottom: 0,
+                              width: 3,
+                              background: "#f44336",
+                              zIndex: 10,
+                              boxShadow: "0 0 4px rgba(244,67,54,0.5)",
+                            }}
+                          />
+                        )}
+                      </div>
+
+                      {/* Lyrics row aligned to timestamps */}
+                      {row.lyrics.length > 0 && (
+                        <div
+                          style={{
+                            position: "relative",
+                            minHeight: 24,
+                            marginTop: 4,
+                          }}
+                        >
+                          {row.lyrics.map((lyric, i) => {
+                            const lyricStart = Math.max(lyric.t, row.rowStart);
+                            const left = ((lyricStart - row.rowStart) / rowWidth) * 100;
+                            const isCurrentLyric =
+                              i < row.lyrics.length - 1
+                                ? currentTime >= lyric.t && currentTime < row.lyrics[i + 1].t
+                                : currentTime >= lyric.t;
+
+                            return (
+                              <div
+                                key={i}
+                                onClick={() => {
+                                  if (audioRef.current) {
+                                    audioRef.current.currentTime = lyric.t;
+                                  }
+                                }}
+                                style={{
+                                  position: "absolute",
+                                  left: `${left}%`,
+                                  fontSize: 12,
+                                  color: isCurrentLyric ? "#1976D2" : "#666",
+                                  fontWeight: isCurrentLyric ? 600 : 400,
+                                  cursor: "pointer",
+                                  whiteSpace: "nowrap",
+                                  maxWidth: "30%",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  background: isCurrentLyric ? "#e3f2fd" : "transparent",
+                                  padding: "2px 4px",
+                                  borderRadius: 4,
+                                }}
+                                title={`${lyric.text} (${formatTime(lyric.t)})`}
+                              >
+                                {lyric.text}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                    <div style={{ color: isCurrentLine ? "#333" : "#666" }}>
-                      {line.text}
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+          {/* Traditional Chord Sheet View (collapsible) */}
+          <details style={{ marginTop: 16 }}>
+            <summary style={{ cursor: "pointer", fontWeight: 600, marginBottom: 12 }}>
+              Traditional Chord Sheet View
+            </summary>
+            <div
+              style={{
+                fontFamily:
+                  "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+                lineHeight: 1.6,
+              }}
+            >
+              {result.aligned_lrc ? (
+                // LRC-aligned display with timing
+                result.aligned_lrc.map((line, i) => {
+                  const isCurrentLine =
+                    i < result.aligned_lrc.length - 1
+                      ? currentTime >= line.t && currentTime < result.aligned_lrc[i + 1].t
+                      : currentTime >= line.t;
+
+                  return (
+                    <div
+                      key={i}
+                      onClick={() => {
+                        if (audioRef.current) {
+                          audioRef.current.currentTime = line.t;
+                        }
+                      }}
+                      style={{
+                        marginBottom: 16,
+                        padding: "8px 12px",
+                        borderRadius: 8,
+                        background: isCurrentLine ? "#e3f2fd" : "transparent",
+                        cursor: "pointer",
+                        transition: "background 0.2s",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          color: isCurrentLine ? "#1976D2" : "#333",
+                          fontSize: 18,
+                        }}
+                      >
+                        {line.chord}
+                      </div>
+                      <div style={{ color: isCurrentLine ? "#333" : "#666" }}>
+                        {line.text}
+                      </div>
+                      <div style={{ fontSize: 10, color: "#999" }}>
+                        {formatTime(line.t)}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 10, color: "#999" }}>
-                      {formatTime(line.t)}
-                    </div>
+                  );
+                })
+              ) : (
+                // Fallback: show sheet_lines without timing
+                result.sheet_lines.map((l, i) => (
+                  <div key={i} style={{ marginBottom: 12 }}>
+                    <div style={{ fontWeight: 700 }}>{l.chordsLine}</div>
+                    <div>{l.lyricsLine}</div>
                   </div>
-                );
-              })
-            ) : (
-              // Fallback: show sheet_lines without timing
-              result.sheet_lines.map((l, i) => (
-                <div key={i} style={{ marginBottom: 12 }}>
-                  <div style={{ fontWeight: 700 }}>{l.chordsLine}</div>
-                  <div>{l.lyricsLine}</div>
-                </div>
-              ))
-            )}
-          </div>
+                ))
+              )}
+            </div>
+          </details>
 
           {/* Chord progression summary */}
           <div style={{ marginTop: 24 }}>
