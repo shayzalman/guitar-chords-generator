@@ -1,6 +1,38 @@
 import yt_dlp
 import os
-import tempfile
+import re
+from urllib.parse import urlparse, parse_qs
+
+
+def extract_video_id(url: str) -> str:
+    """Extract the YouTube video ID from various URL formats."""
+    # Handle youtu.be short URLs
+    if "youtu.be" in url:
+        path = urlparse(url).path
+        return path.lstrip("/").split("?")[0]
+
+    # Handle youtube.com URLs
+    parsed = urlparse(url)
+    if "youtube.com" in parsed.netloc:
+        # Standard watch URL: youtube.com/watch?v=VIDEO_ID
+        if parsed.path == "/watch":
+            qs = parse_qs(parsed.query)
+            if "v" in qs:
+                return qs["v"][0]
+        # Embed URL: youtube.com/embed/VIDEO_ID
+        elif "/embed/" in parsed.path:
+            return parsed.path.split("/embed/")[1].split("?")[0]
+        # Shorts URL: youtube.com/shorts/VIDEO_ID
+        elif "/shorts/" in parsed.path:
+            return parsed.path.split("/shorts/")[1].split("?")[0]
+
+    # Fallback: try regex for video ID pattern
+    match = re.search(r"(?:v=|/)([a-zA-Z0-9_-]{11})(?:\?|&|$|/)", url)
+    if match:
+        return match.group(1)
+
+    raise ValueError(f"Could not extract video ID from URL: {url}")
+
 
 def download_youtube_audio(url: str, output_dir: str) -> dict:
     """
@@ -36,6 +68,7 @@ def download_youtube_audio(url: str, output_dir: str) -> dict:
         
         return {
             "path": mp3_path,
+            "video_id": info.get("id", extract_video_id(url)),
             "title": info.get("title", "Unknown Title"),
             "artist": info.get("uploader", "Unknown Artist"),
             "duration": info.get("duration"),

@@ -4,12 +4,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import tempfile
 import os
-import uuid
+import json
 import subprocess
 from chordino import run_chordino, postprocess_chords
 from lyrics_align import align_chords_to_lrc, build_chord_sheet_lines
 from beat_detection import detect_beats
-from youtube_utils import download_youtube_audio
+from youtube_utils import download_youtube_audio, extract_video_id
 
 
 app = FastAPI()
@@ -111,12 +111,75 @@ async def analyze_youtube(
     lyrics_text: str = Form(""),
     lrc_text: str = Form(""),
 ):
-    """Download audio from YouTube, analyze it and return results."""
-    # Use a unique ID for this download to avoid collisions
-    job_id = str(uuid.uuid4())
-    job_dir = os.path.join(DOWNLOADS_DIR, job_id)
+    """Download audio from YouTube, analyze it and return results.
+
+    Uses caching: if the video was previously processed, loads cached data.
+    Cache is stored in downloads/<video_id>/ with metadata.json containing
+    all analysis results.
+    """
+    # Extract video ID to use as cache key
+    try:
+        video_id = extract_video_id(youtube_url)
+    except ValueError as e:
+        return {"error": str(e)}
+
+    job_dir = os.path.join(DOWNLOADS_DIR, video_id)
+    cache_file = os.path.join(job_dir, "metadata.json")
+
+    # Check if we have cached data for this video
+    if os.path.exists(cache_file):
+        try:
+            with open(cache_file, "r", encoding="utf-8") as f:
+                cached_data = json.load(f)
+
+            # Re-apply transpose and mode settings (these can change per request)
+            chords = cached_data.get("chords_raw", cached_data.get("chords", []))
+            chords = postprocess_chords(chords, transpose=transpose, mode=mode)
+
+            # Re-align to LRC if provided
+            aligned = None
+            if lrc_text.strip():
+                aligned = align_chords_to_lrc(chords, lrc_text)
+
+            # Rebuild sheet lines with current settings
+            sheet_lines = build_chord_sheet_lines(
+                chords=chords,
+                lyrics_text=lyrics_text,
+                aligned_lrc=aligned,
+                mode=mode,
+            )
+
+            # Find the MP3 file in the cache directory
+            mp3_files = [f for f in os.listdir(job_dir) if f.endswith(".mp3")]
+            if mp3_files:
+                audio_url = f"/downloads/{video_id}/{mp3_files[0]}"
+            else:
+                audio_url = cached_data.get("meta", {}).get("audio_url", "")
+
+            return {
+                "meta": {
+                    "title": cached_data.get("meta", {}).get("title", ""),
+                    "artist": cached_data.get("meta", {}).get("artist", ""),
+                    "transpose": transpose,
+                    "mode": mode,
+                    "youtube_url": youtube_url,
+                    "audio_url": audio_url,
+                    "thumbnail": cached_data.get("meta", {}).get("thumbnail"),
+                    "duration": cached_data.get("meta", {}).get("duration"),
+                    "cached": True,
+                },
+                "chords": chords,
+                "aligned_lrc": aligned,
+                "sheet_lines": sheet_lines,
+                "beat_info": cached_data.get("beat_info", {}),
+            }
+        except (json.JSONDecodeError, KeyError) as e:
+            # Cache is corrupted, reprocess
+            pass
+
+    # No cache found, download and process
     os.makedirs(job_dir, exist_ok=True)
-    
+
     # Download audio from YouTube
     try:
         yt_data = download_youtube_audio(youtube_url, job_dir)
@@ -137,8 +200,8 @@ async def analyze_youtube(
         ])
 
         # Run chord detection and post‑process according to settings
-        chords = run_chordino(wav_path)  # list of {start, end, label}
-        chords = postprocess_chords(chords, transpose=transpose, mode=mode)
+        chords_raw = run_chordino(wav_path)  # list of {start, end, label}
+        chords = postprocess_chords(chords_raw, transpose=transpose, mode=mode)
 
         # Detect beats, tempo, and time signature
         beat_info = detect_beats(wav_path)
@@ -157,10 +220,25 @@ async def analyze_youtube(
         )
 
         filename = os.path.basename(mp3_path)
-        # Use relative path for internal URL or just the filename if we know the structure
-        # audio_url = f"http://localhost:4433/downloads/{job_id}/{filename}"
-        # In a real app we'd use a proper base URL or relative path
-        audio_url = f"/downloads/{job_id}/{filename}"
+        audio_url = f"/downloads/{video_id}/{filename}"
+
+        # Save cache data (raw chords without transpose/mode applied)
+        cache_data = {
+            "meta": {
+                "title": yt_title or filename.replace(".mp3", ""),
+                "artist": yt_artist,
+                "youtube_url": youtube_url,
+                "audio_url": audio_url,
+                "thumbnail": yt_data.get("thumbnail"),
+                "duration": yt_data.get("duration"),
+                "video_id": video_id,
+            },
+            "chords_raw": chords_raw,  # Raw chords for reprocessing with different settings
+            "beat_info": beat_info,
+        }
+
+        with open(cache_file, "w", encoding="utf-8") as f:
+            json.dump(cache_data, f, ensure_ascii=False, indent=2)
 
         return {
             "meta": {
@@ -172,6 +250,7 @@ async def analyze_youtube(
                 "audio_url": audio_url,
                 "thumbnail": yt_data.get("thumbnail"),
                 "duration": yt_data.get("duration"),
+                "cached": False,
             },
             "chords": chords,
             "aligned_lrc": aligned,
