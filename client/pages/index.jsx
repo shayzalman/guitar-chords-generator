@@ -60,23 +60,63 @@ export default function Home() {
     }
   }, [audio]);
 
-  // Update current time during playback
+  // Update current time during playback using requestAnimationFrame for smooth sync
   useEffect(() => {
     const audioEl = audioRef.current;
     if (!audioEl) return;
 
-    const handleTimeUpdate = () => setCurrentTime(audioEl.currentTime);
-    const handleLoadedMetadata = () => setDuration(audioEl.duration);
-    const handleEnded = () => setIsPlaying(false);
+    let animationFrameId = null;
 
-    audioEl.addEventListener("timeupdate", handleTimeUpdate);
+    const updateTime = () => {
+      if (audioEl && !audioEl.paused) {
+        setCurrentTime(audioEl.currentTime);
+        animationFrameId = requestAnimationFrame(updateTime);
+      }
+    };
+
+    const handlePlay = () => {
+      animationFrameId = requestAnimationFrame(updateTime);
+    };
+
+    const handlePause = () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+      setCurrentTime(audioEl.currentTime);
+    };
+
+    const handleSeeked = () => {
+      setCurrentTime(audioEl.currentTime);
+    };
+
+    const handleLoadedMetadata = () => setDuration(audioEl.duration);
+    const handleEnded = () => {
+      setIsPlaying(false);
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
+
+    audioEl.addEventListener("play", handlePlay);
+    audioEl.addEventListener("pause", handlePause);
+    audioEl.addEventListener("seeked", handleSeeked);
     audioEl.addEventListener("loadedmetadata", handleLoadedMetadata);
     audioEl.addEventListener("ended", handleEnded);
 
+    // If already playing when effect runs, start the animation loop
+    if (!audioEl.paused) {
+      animationFrameId = requestAnimationFrame(updateTime);
+    }
+
     return () => {
-      audioEl.removeEventListener("timeupdate", handleTimeUpdate);
+      audioEl.removeEventListener("play", handlePlay);
+      audioEl.removeEventListener("pause", handlePause);
+      audioEl.removeEventListener("seeked", handleSeeked);
       audioEl.removeEventListener("loadedmetadata", handleLoadedMetadata);
       audioEl.removeEventListener("ended", handleEnded);
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
     };
   }, [audioUrl]);
 
@@ -586,7 +626,6 @@ export default function Home() {
                     alignItems: "center",
                     justifyContent: "center",
                     cursor: "pointer",
-                    transition: "background 0.1s",
                     zIndex: 1,
                   }}
                   title={`${chord.label} (${formatTime(chord.start)} - ${formatTime(chord.end)})`}
@@ -690,7 +729,6 @@ export default function Home() {
                         background: isCurrentRow ? "#f0f7ff" : "#fafafa",
                         borderRadius: 8,
                         border: isCurrentRow ? "2px solid #2196F3" : "1px solid #e0e0e0",
-                        transition: "all 0.3s ease",
                       }}
                     >
                       {/* Time markers row */}
@@ -828,7 +866,6 @@ export default function Home() {
                                 alignItems: "center",
                                 justifyContent: "center",
                                 cursor: "pointer",
-                                transition: "background 0.15s",
                               }}
                               title={`${chord.label} (${formatTime(chord.start)} - ${formatTime(chord.end)})`}
                             >
@@ -956,7 +993,6 @@ export default function Home() {
                         borderRadius: 8,
                         background: isCurrentLine ? "#e3f2fd" : "transparent",
                         cursor: "pointer",
-                        transition: "background 0.2s",
                       }}
                     >
                       <div
@@ -1013,7 +1049,6 @@ export default function Home() {
                         fontWeight: 600,
                         cursor: "pointer",
                         fontSize: 14,
-                        transition: "all 0.1s",
                       }}
                       title={`${formatTime(chord.start)} - ${formatTime(chord.end)}`}
                     >
