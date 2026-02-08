@@ -187,15 +187,39 @@ export default function Home() {
     audioEl.currentTime = pct * duration;
   }
 
-  // Find current chord based on playback time
-  function getCurrentChord() {
-    if (!result?.chords) return null;
-    for (const c of result.chords) {
+  // Find current chord and upcoming chords based on playback time
+  function getCurrentAndUpcomingChords() {
+    if (!result?.chords) return { current: null, upcoming: [] };
+
+    let currentIdx = -1;
+    for (let i = 0; i < result.chords.length; i++) {
+      const c = result.chords[i];
       if (c.start <= currentTime && currentTime < c.end) {
-        return c;
+        currentIdx = i;
+        break;
       }
     }
-    return null;
+
+    if (currentIdx === -1) {
+      // No current chord, find the next one
+      for (let i = 0; i < result.chords.length; i++) {
+        if (result.chords[i].start > currentTime) {
+          return { current: null, upcoming: result.chords.slice(i, i + 4).filter(c => c.label !== "N") };
+        }
+      }
+      return { current: null, upcoming: [] };
+    }
+
+    const current = result.chords[currentIdx];
+    // Get next 3 chords that are not "N" (no chord)
+    const upcoming = [];
+    for (let i = currentIdx + 1; i < result.chords.length && upcoming.length < 3; i++) {
+      if (result.chords[i].label !== "N") {
+        upcoming.push(result.chords[i]);
+      }
+    }
+
+    return { current, upcoming };
   }
 
   // Format time as mm:ss
@@ -205,7 +229,7 @@ export default function Home() {
     return `${m}:${s.toString().padStart(2, "0")}`;
   }
 
-  const currentChord = getCurrentChord();
+  const { current: currentChord, upcoming: upcomingChords } = getCurrentAndUpcomingChords();
 
   return (
     <div
@@ -398,10 +422,10 @@ export default function Home() {
             top: 0,
             zIndex: 99,
             padding: 16,
-            border: "1px solid #ddd",
+            border: "1px solid #e0c84a",
             borderRadius: 12,
-            background: "#f9f9f9",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+            background: "#fff8a1",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
           }}
         >
           <audio ref={audioRef} src={audioUrl} preload="metadata" />
@@ -455,29 +479,74 @@ export default function Home() {
                 <span>{formatTime(duration)}</span>
               </div>
             </div>
-            {/* Current chord display - inline when sticky */}
+            {/* Current chord and upcoming chords display */}
             {result && (
               <div
                 style={{
-                  textAlign: "center",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
                   flexShrink: 0,
-                  minWidth: 100,
+                  paddingLeft: 16,
+                  borderLeft: "2px solid rgba(0,0,0,0.1)",
+                  marginLeft: 8,
                 }}
               >
-                <div style={{ fontSize: 10, color: "#666" }}>
-                  Chord
+                {/* Current chord */}
+                <div style={{ textAlign: "center", minWidth: 70 }}>
+                  <div style={{ fontSize: 9, color: "#666", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    Now
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 42,
+                      fontWeight: 700,
+                      fontFamily: "ui-monospace, monospace",
+                      color: currentChord?.label === "N" ? "#ccc" : "#222",
+                      lineHeight: 1,
+                    }}
+                  >
+                    {currentChord?.label || "-"}
+                  </div>
                 </div>
-                <div
-                  style={{
-                    fontSize: 36,
-                    fontWeight: 700,
-                    fontFamily: "ui-monospace, monospace",
-                    color: currentChord?.label === "N" ? "#ccc" : "#333",
-                    lineHeight: 1,
-                  }}
-                >
-                  {currentChord?.label || "-"}
-                </div>
+
+                {/* Upcoming chords */}
+                {upcomingChords.length > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      opacity: 0.7,
+                    }}
+                  >
+                    <div style={{ fontSize: 18, color: "#999", marginRight: 4 }}>›</div>
+                    {upcomingChords.map((chord, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          textAlign: "center",
+                          padding: "4px 8px",
+                          background: "rgba(255,255,255,0.6)",
+                          borderRadius: 6,
+                          minWidth: 36,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 18 - i * 2,
+                            fontWeight: 600,
+                            fontFamily: "ui-monospace, monospace",
+                            color: "#555",
+                            lineHeight: 1.2,
+                          }}
+                        >
+                          {chord.label}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
