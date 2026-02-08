@@ -9,7 +9,7 @@ def extract_video_id(url: str) -> str:
     # Handle youtu.be short URLs
     if "youtu.be" in url:
         path = urlparse(url).path
-        return path.lstrip("/").split("?")[0]
+        return path.lstrip("/").split("?")[0].split("/")[0]
 
     # Handle youtube.com URLs
     parsed = urlparse(url)
@@ -21,10 +21,10 @@ def extract_video_id(url: str) -> str:
                 return qs["v"][0]
         # Embed URL: youtube.com/embed/VIDEO_ID
         elif "/embed/" in parsed.path:
-            return parsed.path.split("/embed/")[1].split("?")[0]
+            return parsed.path.split("/embed/")[1].split("?")[0].split("/")[0]
         # Shorts URL: youtube.com/shorts/VIDEO_ID
         elif "/shorts/" in parsed.path:
-            return parsed.path.split("/shorts/")[1].split("?")[0]
+            return parsed.path.split("/shorts/")[1].split("?")[0].split("/")[0]
 
     # Fallback: try regex for video ID pattern
     match = re.search(r"(?:v=|/)([a-zA-Z0-9_-]{11})(?:\?|&|$|/)", url)
@@ -34,10 +34,26 @@ def extract_video_id(url: str) -> str:
     raise ValueError(f"Could not extract video ID from URL: {url}")
 
 
+def clean_youtube_url(url: str) -> str:
+    """
+    Clean a YouTube URL by removing extra parameters (list, index, etc.)
+    and keeping only the video ID parameter.
+
+    Returns a clean URL in the format: https://www.youtube.com/watch?v=VIDEO_ID
+    """
+    video_id = extract_video_id(url)
+    return f"https://www.youtube.com/watch?v={video_id}"
+
+
 def download_youtube_audio(url: str, output_dir: str) -> dict:
     """
     Downloads audio from a YouTube URL and returns a dictionary with metadata and the path to the downloaded file.
+
+    The URL is cleaned to remove extra parameters (list, index, etc.) before processing.
     """
+    # Clean URL to only include video ID (removes playlist and other params)
+    url = clean_youtube_url(url)
+
     ydl_opts = {
         'format': 'bestaudio/best',
         'postprocessors': [{

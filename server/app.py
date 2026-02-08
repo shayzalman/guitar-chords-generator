@@ -9,7 +9,7 @@ import subprocess
 from chordino import run_chordino, postprocess_chords
 from lyrics_align import align_chords_to_lrc, build_chord_sheet_lines
 from beat_detection import detect_beats
-from youtube_utils import download_youtube_audio, extract_video_id
+from youtube_utils import download_youtube_audio, extract_video_id, clean_youtube_url
 from lyrics_fetch import fetch_lyrics
 
 
@@ -133,9 +133,10 @@ async def analyze_youtube(
     Cache is stored in downloads/<video_id>/ with metadata.json containing
     all analysis results including lyrics.
     """
-    # Extract video ID to use as cache key
+    # Clean the URL to remove extra params (list, index, etc.) and extract video ID
     try:
         video_id = extract_video_id(youtube_url)
+        youtube_url = clean_youtube_url(youtube_url)  # Use cleaned URL from now on
     except ValueError as e:
         return {"error": str(e)}
 

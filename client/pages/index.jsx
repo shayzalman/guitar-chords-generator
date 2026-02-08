@@ -23,6 +23,7 @@ export default function Home() {
 
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [autoScroll, setAutoScroll] = useState(true);
 
   // Audio playback state
   const audioRef = useRef(null);
@@ -32,8 +33,8 @@ export default function Home() {
 
   // Auto-scroll to active row
   useEffect(() => {
-    // Only scroll if we are playing and have results
-    if (!isPlaying || !result) return;
+    // Only scroll if auto-scroll is enabled, we are playing and have results
+    if (!autoScroll || !isPlaying || !result) return;
 
     // Find current row index (rows are 10 seconds each)
     const rowDuration = 10;
