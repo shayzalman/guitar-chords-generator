@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import Head from "next/head";
 
 /**
  * Main page component for the chord sheet generator.
@@ -271,16 +272,22 @@ export default function Home() {
   const { current: currentChord, upcoming: upcomingChords } = getCurrentAndUpcomingChords();
 
   return (
-    <div
-      style={{
-        maxWidth: 980,
-        margin: "24px auto",
-        fontFamily: "system-ui",
-        padding: "0 16px",
-        textAlign: "center",
-      }}
-    >
-      <h1>ZorKi - Get me Chords</h1>
+    <>
+      <Head>
+        <title>ZorKi - Get Me Chords</title>
+        <meta name="description" content="Automatically detect chords from YouTube videos" />
+        <link rel="icon" href="/favicon.ico" />
+      </Head>
+      <div
+        style={{
+          maxWidth: 980,
+          margin: "24px auto",
+          fontFamily: "system-ui",
+          padding: "0 16px",
+          textAlign: "center",
+        }}
+      >
+        <h1>ZorKi - Get me Chords</h1>
 
       {/* Input section: YouTube URL and settings */}
       <div
@@ -1211,5 +1218,6 @@ export default function Home() {
         </div>
       )}
     </div>
+    </>
   );
 }
