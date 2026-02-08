@@ -3,16 +3,16 @@ import { useState, useRef, useEffect } from "react";
 /**
  * Main page component for the chord sheet generator.
  *
- * This React component provides a UI to load metadata from a YouTube
- * URL, upload an audio file, configure analysis settings (transpose and
- * mode), optionally include lyrics and LRC for alignment, and display
- * the resulting chord sheet synchronized with audio playback.
+ * This React component provides a UI to analyze YouTube videos for chord
+ * detection, configure analysis settings (transpose and mode), optionally
+ * include lyrics and LRC for alignment, and display the resulting chord
+ * sheet synchronized with audio playback. Analyzed songs are cached on
+ * the server along with their lyrics for quick reloading.
  */
 export default function Home() {
   const [ytUrl, setYtUrl] = useState("");
   const [meta, setMeta] = useState(null);
 
-  const [audio, setAudio] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
   const [transpose, setTranspose] = useState(0);
   const [mode, setMode] = useState("simple"); // 'simple' | 'full'
@@ -22,7 +22,6 @@ export default function Home() {
 
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [downloading, setDownloading] = useState(false);
 
   // Audio playback state
   const audioRef = useRef(null);
@@ -48,17 +47,6 @@ export default function Home() {
       });
     }
   }, [Math.floor(currentTime / 10), isPlaying, !!result]);
-
-  // Create object URL for audio playback when file is selected
-  useEffect(() => {
-    if (audio) {
-      const url = URL.createObjectURL(audio);
-      setAudioUrl(url);
-      return () => URL.revokeObjectURL(url);
-    } else {
-      setAudioUrl(null);
-    }
-  }, [audio]);
 
   // Update current time during playback using requestAnimationFrame for smooth sync
   useEffect(() => {
@@ -121,37 +109,6 @@ export default function Home() {
   }, [audioUrl]);
 
   /**
-   * Send the uploaded audio and settings to the backend for analysis.
-   */
-  async function analyze() {
-    if (!audio) return;
-    setLoading(true);
-    setResult(null);
-
-    const fd = new FormData();
-    fd.append("audio", audio);
-    fd.append("transpose", String(transpose));
-    fd.append("mode", mode);
-    fd.append("title", meta?.title || "");
-    fd.append("artist", meta?.author_name || "");
-    fd.append("lyrics_text", lyricsText);
-    fd.append("lrc_text", lrcText);
-
-    try {
-      const r = await fetch("http://localhost:4433/api/analyze", {
-        method: "POST",
-        body: fd,
-      });
-      const j = await r.json();
-      setResult(j);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  /**
    * Extract audio from YouTube and analyze.
    */
   async function analyzeYoutube() {
@@ -189,10 +146,18 @@ export default function Home() {
 
       if (j.meta?.audio_url) {
         // Handle both relative and absolute URLs
-        const finalAudioUrl = j.meta.audio_url.startsWith("http") 
-          ? j.meta.audio_url 
+        const finalAudioUrl = j.meta.audio_url.startsWith("http")
+          ? j.meta.audio_url
           : `http://localhost:4433${j.meta.audio_url}`;
         setAudioUrl(finalAudioUrl);
+      }
+
+      // Load cached lyrics if available and not already set
+      if (j.lyrics_text && !lyricsText) {
+        setLyricsText(j.lyrics_text);
+      }
+      if (j.lrc_text && !lrcText) {
+        setLrcText(j.lrc_text);
       }
     } catch (err) {
       console.error(err);
@@ -253,80 +218,53 @@ export default function Home() {
     >
       <h1>Chord Sheet Generator</h1>
 
-      {/* Input section: YouTube metadata and audio upload */}
+      {/* Input section: YouTube URL and settings */}
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 16,
+          padding: 16,
+          border: "1px solid #ddd",
+          borderRadius: 12,
           marginBottom: 24,
         }}
       >
+        <h3>YouTube URL</h3>
+        <input
+          value={ytUrl}
+          onChange={(e) => setYtUrl(e.target.value)}
+          placeholder="https://www.youtube.com/watch?v=..."
+          style={{ width: "100%", padding: 10, boxSizing: "border-box", marginBottom: 12 }}
+        />
+
+        {/* Settings row */}
         <div
-          style={{ padding: 16, border: "1px solid #ddd", borderRadius: 12 }}
+          style={{
+            display: "flex",
+            gap: 24,
+            alignItems: "center",
+            flexWrap: "wrap",
+            marginBottom: 12,
+          }}
         >
-          <h3>YouTube URL</h3>
-          <input
-            value={ytUrl}
-            onChange={(e) => setYtUrl(e.target.value)}
-            placeholder="https://www.youtube.com/watch?v=..."
-            style={{ width: "100%", padding: 10, boxSizing: "border-box" }}
-          />
-          <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-            <button 
-              onClick={analyzeYoutube} 
-              disabled={!ytUrl || loading}
-              style={{ background: "#f44336", color: "white", border: "none", padding: "8px 16px", borderRadius: 4, cursor: "pointer" }}
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <b>Transpose</b>
+            <button
+              onClick={() => setTranspose((t) => t - 1)}
+              style={{ padding: "4px 10px", cursor: "pointer" }}
             >
-              {loading && !audio ? "Downloading & Analyzing..." : "Download & Analyze YouTube"}
+              -½
+            </button>
+            <div style={{ width: 40, textAlign: "center", fontWeight: 600 }}>{transpose}</div>
+            <button
+              onClick={() => setTranspose((t) => t + 1)}
+              style={{ padding: "4px 10px", cursor: "pointer" }}
+            >
+              +½
             </button>
           </div>
 
-          {meta && (
-            <div style={{ marginTop: 12 }}>
-              <div>
-                <b>{meta.title}</b>
-              </div>
-              <div style={{ color: "#666" }}>{meta.author_name}</div>
-              <img
-                src={meta.thumbnail_url}
-                alt="Video thumbnail"
-                style={{
-                  width: "100%",
-                  marginTop: 10,
-                  borderRadius: 10,
-                }}
-              />
-            </div>
-          )}
-        </div>
-
-        <div
-          style={{ padding: 16, border: "1px solid #ddd", borderRadius: 12 }}
-        >
-          <h3>Audio file (upload)</h3>
-          <input
-            type="file"
-            accept="audio/*"
-            onChange={(e) => setAudio(e.target.files?.[0] || null)}
-          />
-          <div
-            style={{
-              marginTop: 12,
-              display: "flex",
-              gap: 10,
-              alignItems: "center",
-            }}
-          >
-            <b>Modulation</b>
-            <button onClick={() => setTranspose((t) => t - 1)}>-½</button>
-            <div style={{ width: 40, textAlign: "center" }}>{transpose}</div>
-            <button onClick={() => setTranspose((t) => t + 1)}>+½</button>
-          </div>
-
-          <div style={{ marginTop: 12 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <b>Mode</b>
-            <label style={{ marginLeft: 10 }}>
+            <label style={{ marginLeft: 4 }}>
               <input
                 type="radio"
                 checked={mode === "simple"}
@@ -334,7 +272,7 @@ export default function Home() {
               />
               Simple
             </label>
-            <label style={{ marginLeft: 10 }}>
+            <label style={{ marginLeft: 8 }}>
               <input
                 type="radio"
                 checked={mode === "full"}
@@ -345,65 +283,125 @@ export default function Home() {
           </div>
 
           <button
-            onClick={analyze}
-            disabled={!audio || loading}
-            style={{ marginTop: 12 }}
+            onClick={analyzeYoutube}
+            disabled={!ytUrl || loading}
+            style={{
+              background: "#f44336",
+              color: "white",
+              border: "none",
+              padding: "10px 20px",
+              borderRadius: 4,
+              cursor: ytUrl && !loading ? "pointer" : "not-allowed",
+              fontWeight: 600,
+            }}
           >
-            {loading ? "Processing..." : "Generate chord sheet"}
+            {loading ? "Processing..." : "Analyze"}
           </button>
         </div>
+
+        {meta && (
+          <div
+            style={{
+              display: "flex",
+              gap: 16,
+              alignItems: "center",
+              marginTop: 12,
+              padding: 12,
+              background: "#f9f9f9",
+              borderRadius: 8,
+            }}
+          >
+            {meta.thumbnail_url && (
+              <img
+                src={meta.thumbnail_url}
+                alt="Video thumbnail"
+                style={{
+                  width: 120,
+                  borderRadius: 8,
+                }}
+              />
+            )}
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 16 }}>{meta.title}</div>
+              <div style={{ color: "#666" }}>{meta.author_name}</div>
+              {result?.meta?.cached && (
+                <div style={{ color: "#4CAF50", fontSize: 12, marginTop: 4 }}>
+                  Loaded from cache
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Lyrics input */}
       <div
         style={{
-          marginTop: 16,
           padding: 16,
           border: "1px solid #ddd",
           borderRadius: 12,
+          marginBottom: 16,
         }}
       >
-        <h3>Lyrics (optional)</h3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <h3 style={{ margin: 0 }}>Lyrics (optional)</h3>
+          <span style={{ fontSize: 12, color: "#666" }}>
+            Lyrics are saved with the song
+          </span>
+        </div>
         <div
           style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
         >
-          <textarea
-            value={lyricsText}
-            onChange={(e) => setLyricsText(e.target.value)}
-            placeholder="Paste lyrics text here (optional)"
-            style={{ width: "100%", minHeight: 160, padding: 10 }}
-          />
-          <textarea
-            value={lrcText}
-            onChange={(e) => setLrcText(e.target.value)}
-            placeholder="Paste LRC here for best alignment (optional)\n[00:12.00] line..."
-            style={{ width: "100%", minHeight: 160, padding: 10 }}
-          />
+          <div>
+            <label style={{ fontSize: 12, color: "#666", marginBottom: 4, display: "block" }}>
+              Plain lyrics
+            </label>
+            <textarea
+              value={lyricsText}
+              onChange={(e) => setLyricsText(e.target.value)}
+              placeholder="Paste lyrics text here (optional)"
+              style={{ width: "100%", minHeight: 140, padding: 10, boxSizing: "border-box" }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: "#666", marginBottom: 4, display: "block" }}>
+              LRC format (timed lyrics)
+            </label>
+            <textarea
+              value={lrcText}
+              onChange={(e) => setLrcText(e.target.value)}
+              placeholder="[00:12.00] First line&#10;[00:15.50] Second line..."
+              style={{ width: "100%", minHeight: 140, padding: 10, boxSizing: "border-box" }}
+            />
+          </div>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
-          <div style={{ color: "#666" }}>
-            Tip: אם יש לך LRC, האקורדים ייושרו הרבה יותר טוב לליריקס.
+          <div style={{ color: "#666", fontSize: 13 }}>
+            Tip: LRC provides better chord-to-lyric alignment
           </div>
-          <a 
-            href="https://www.lyricsify.com/" 
-            target="_blank" 
+          <a
+            href="https://www.lyricsify.com/"
+            target="_blank"
             rel="noopener noreferrer"
-            style={{ fontSize: 14, color: "#1976D2", textDecoration: "none" }}
+            style={{ fontSize: 13, color: "#1976D2", textDecoration: "none" }}
           >
-            Search for LRC lyrics on Lyricsify 🔍
+            Find LRC on Lyricsify
           </a>
         </div>
       </div>
 
-      {/* Audio Player */}
+      {/* Audio Player - Sticky */}
       {audioUrl && (
         <div
           style={{
-            marginTop: 16,
+            position: "sticky",
+            top: 0,
+            zIndex: 99,
             padding: 16,
             border: "1px solid #ddd",
             borderRadius: 12,
             background: "#f9f9f9",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
           }}
         >
           <audio ref={audioRef} src={audioUrl} preload="metadata" />
@@ -419,6 +417,7 @@ export default function Home() {
                 color: "#fff",
                 fontSize: 18,
                 cursor: "pointer",
+                flexShrink: 0,
               }}
             >
               {isPlaying ? "⏸" : "▶"}
@@ -456,32 +455,32 @@ export default function Home() {
                 <span>{formatTime(duration)}</span>
               </div>
             </div>
-          </div>
-
-          {/* Current chord display */}
-          {result && (
-            <div
-              style={{
-                marginTop: 16,
-                textAlign: "center",
-              }}
-            >
-              <div style={{ fontSize: 14, color: "#666", marginBottom: 4 }}>
-                Current Chord
-              </div>
+            {/* Current chord display - inline when sticky */}
+            {result && (
               <div
                 style={{
-                  fontSize: 64,
-                  fontWeight: 700,
-                  fontFamily: "ui-monospace, monospace",
-                  color: currentChord?.label === "N" ? "#ccc" : "#333",
-                  minHeight: 80,
+                  textAlign: "center",
+                  flexShrink: 0,
+                  minWidth: 100,
                 }}
               >
-                {currentChord?.label || "-"}
+                <div style={{ fontSize: 10, color: "#666" }}>
+                  Chord
+                </div>
+                <div
+                  style={{
+                    fontSize: 36,
+                    fontWeight: 700,
+                    fontFamily: "ui-monospace, monospace",
+                    color: currentChord?.label === "N" ? "#ccc" : "#333",
+                    lineHeight: 1,
+                  }}
+                >
+                  {currentChord?.label || "-"}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 

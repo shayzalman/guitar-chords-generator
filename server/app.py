@@ -110,12 +110,13 @@ async def analyze_youtube(
     mode: str = Form("simple"),  # simple | full
     lyrics_text: str = Form(""),
     lrc_text: str = Form(""),
+    save_lyrics: bool = Form(True),  # Whether to save/update lyrics in cache
 ):
     """Download audio from YouTube, analyze it and return results.
 
     Uses caching: if the video was previously processed, loads cached data.
     Cache is stored in downloads/<video_id>/ with metadata.json containing
-    all analysis results.
+    all analysis results including lyrics.
     """
     # Extract video ID to use as cache key
     try:
@@ -132,19 +133,32 @@ async def analyze_youtube(
             with open(cache_file, "r", encoding="utf-8") as f:
                 cached_data = json.load(f)
 
+            # Use provided lyrics or fall back to cached lyrics
+            used_lyrics_text = lyrics_text.strip() if lyrics_text.strip() else cached_data.get("lyrics_text", "")
+            used_lrc_text = lrc_text.strip() if lrc_text.strip() else cached_data.get("lrc_text", "")
+
+            # Update cached lyrics if new ones provided
+            if save_lyrics and (lyrics_text.strip() or lrc_text.strip()):
+                if lyrics_text.strip():
+                    cached_data["lyrics_text"] = lyrics_text.strip()
+                if lrc_text.strip():
+                    cached_data["lrc_text"] = lrc_text.strip()
+                with open(cache_file, "w", encoding="utf-8") as f:
+                    json.dump(cached_data, f, ensure_ascii=False, indent=2)
+
             # Re-apply transpose and mode settings (these can change per request)
             chords = cached_data.get("chords_raw", cached_data.get("chords", []))
             chords = postprocess_chords(chords, transpose=transpose, mode=mode)
 
             # Re-align to LRC if provided
             aligned = None
-            if lrc_text.strip():
-                aligned = align_chords_to_lrc(chords, lrc_text)
+            if used_lrc_text:
+                aligned = align_chords_to_lrc(chords, used_lrc_text)
 
             # Rebuild sheet lines with current settings
             sheet_lines = build_chord_sheet_lines(
                 chords=chords,
-                lyrics_text=lyrics_text,
+                lyrics_text=used_lyrics_text,
                 aligned_lrc=aligned,
                 mode=mode,
             )
@@ -172,6 +186,8 @@ async def analyze_youtube(
                 "aligned_lrc": aligned,
                 "sheet_lines": sheet_lines,
                 "beat_info": cached_data.get("beat_info", {}),
+                "lyrics_text": used_lyrics_text,
+                "lrc_text": used_lrc_text,
             }
         except (json.JSONDecodeError, KeyError) as e:
             # Cache is corrupted, reprocess
@@ -235,6 +251,8 @@ async def analyze_youtube(
             },
             "chords_raw": chords_raw,  # Raw chords for reprocessing with different settings
             "beat_info": beat_info,
+            "lyrics_text": lyrics_text.strip(),
+            "lrc_text": lrc_text.strip(),
         }
 
         with open(cache_file, "w", encoding="utf-8") as f:
@@ -256,4 +274,6 @@ async def analyze_youtube(
             "aligned_lrc": aligned,
             "sheet_lines": sheet_lines,
             "beat_info": beat_info,
+            "lyrics_text": lyrics_text.strip(),
+            "lrc_text": lrc_text.strip(),
         }
