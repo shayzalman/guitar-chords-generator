@@ -81,26 +81,6 @@ export default function Home() {
   }, [audioUrl]);
 
   /**
-   * Fetch basic metadata (title, author, thumbnail) from a YouTube URL
-   * using the public oEmbed endpoint.
-   */
-  async function fetchYoutubeMeta() {
-    if (!ytUrl) return;
-    const oembed = `https://www.youtube.com/oembed?url=${encodeURIComponent(
-      ytUrl
-    )}&format=json`;
-    try {
-      const r = await fetch(oembed);
-      if (!r.ok) throw new Error("Failed to fetch YouTube metadata");
-      const j = await r.json();
-      setMeta(j);
-    } catch (err) {
-      console.error(err);
-      setMeta(null);
-    }
-  }
-
-  /**
    * Send the uploaded audio and settings to the backend for analysis.
    */
   async function analyze() {
@@ -157,6 +137,16 @@ export default function Home() {
         return;
       }
       setResult(j);
+      
+      // Update local metadata if the backend returned it
+      if (j.meta) {
+        setMeta({
+          title: j.meta.title,
+          author_name: j.meta.artist,
+          thumbnail_url: j.meta.thumbnail,
+        });
+      }
+
       if (j.meta?.audio_url) {
         // Handle both relative and absolute URLs
         const finalAudioUrl = j.meta.audio_url.startsWith("http") 
@@ -235,7 +225,7 @@ export default function Home() {
         <div
           style={{ padding: 16, border: "1px solid #ddd", borderRadius: 12 }}
         >
-          <h3>YouTube URL (metadata only)</h3>
+          <h3>YouTube URL</h3>
           <input
             value={ytUrl}
             onChange={(e) => setYtUrl(e.target.value)}
@@ -243,15 +233,12 @@ export default function Home() {
             style={{ width: "100%", padding: 10, boxSizing: "border-box" }}
           />
           <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-            <button onClick={fetchYoutubeMeta}>
-              Load video info
-            </button>
             <button 
               onClick={analyzeYoutube} 
               disabled={!ytUrl || loading}
               style={{ background: "#f44336", color: "white", border: "none", padding: "8px 16px", borderRadius: 4, cursor: "pointer" }}
             >
-              {loading && !audio ? "Downloading & Analyzing..." : "Extract & Analyze Audio"}
+              {loading && !audio ? "Downloading & Analyzing..." : "Download & Analyze YouTube"}
             </button>
           </div>
 
@@ -524,7 +511,7 @@ export default function Home() {
           >
             {/* Bar lines (downbeats) */}
             {result.beat_info?.downbeats?.map((downbeat, i) => {
-              const totalDuration = duration || result.chords[result.chords.length - 1]?.end || 1;
+              const totalDuration = duration || result.chords?.[result.chords?.length - 1]?.end || 1;
               const left = (downbeat / totalDuration) * 100;
               return (
                 <div
@@ -546,7 +533,7 @@ export default function Home() {
 
             {/* Beat markers (smaller ticks) */}
             {result.beat_info?.beats?.map((beat, i) => {
-              const totalDuration = duration || result.chords[result.chords.length - 1]?.end || 1;
+              const totalDuration = duration || result.chords?.[result.chords?.length - 1]?.end || 1;
               const left = (beat / totalDuration) * 100;
               const isDownbeat = result.beat_info?.downbeats?.some(
                 (db) => Math.abs(db - beat) < 0.05
@@ -570,7 +557,7 @@ export default function Home() {
             })}
 
             {result.chords?.map((chord, i) => {
-              const totalDuration = duration || result.chords[result.chords.length - 1]?.end || 1;
+              const totalDuration = duration || result.chords?.[result.chords?.length - 1]?.end || 1;
               const left = (chord.start / totalDuration) * 100;
               const width = ((chord.end - chord.start) / totalDuration) * 100;
               const isActive = currentChord === chord;
@@ -645,6 +632,7 @@ export default function Home() {
           
           {/* Timeline Grid - Chords aligned to timestamps */}
           {(() => {
+            if (!result?.chords || result.chords.length === 0) return null;
             const totalDur = duration || result.chords[result.chords.length - 1]?.end || 1;
             // Get beat info for bar lines
             const downbeats = result.beat_info?.downbeats || [];

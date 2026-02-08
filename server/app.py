@@ -100,7 +100,7 @@ async def analyze(
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "1.1"}
+    return {"status": "ok", "version": "1.2", "features": ["analyze", "analyze-youtube", "beat-detection"]}
 
 
 @app.post("/api/analyze-youtube")
@@ -119,7 +119,10 @@ async def analyze_youtube(
     
     # Download audio from YouTube
     try:
-        mp3_path = download_youtube_audio(youtube_url, job_dir)
+        yt_data = download_youtube_audio(youtube_url, job_dir)
+        mp3_path = yt_data["path"]
+        yt_title = yt_data.get("title", "")
+        yt_artist = yt_data.get("artist", "")
     except Exception as e:
         return {"error": f"Failed to download YouTube audio: {str(e)}"}
 
@@ -161,11 +164,14 @@ async def analyze_youtube(
 
         return {
             "meta": {
-                "title": filename.replace(".mp3", ""),
+                "title": yt_title or filename.replace(".mp3", ""),
+                "artist": yt_artist,
                 "transpose": transpose,
                 "mode": mode,
                 "youtube_url": youtube_url,
-                "audio_url": audio_url
+                "audio_url": audio_url,
+                "thumbnail": yt_data.get("thumbnail"),
+                "duration": yt_data.get("duration"),
             },
             "chords": chords,
             "aligned_lrc": aligned,

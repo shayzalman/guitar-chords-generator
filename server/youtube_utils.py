@@ -2,9 +2,9 @@ import yt_dlp
 import os
 import tempfile
 
-def download_youtube_audio(url: str, output_dir: str) -> str:
+def download_youtube_audio(url: str, output_dir: str) -> dict:
     """
-    Downloads audio from a YouTube URL and returns the path to the downloaded file (converted to mp3).
+    Downloads audio from a YouTube URL and returns a dictionary with metadata and the path to the downloaded file.
     """
     ydl_opts = {
         'format': 'bestaudio/best',
@@ -34,4 +34,10 @@ def download_youtube_audio(url: str, output_dir: str) -> str:
              if files:
                  mp3_path = os.path.join(output_dir, files[0])
         
-        return mp3_path
+        return {
+            "path": mp3_path,
+            "title": info.get("title", "Unknown Title"),
+            "artist": info.get("uploader", "Unknown Artist"),
+            "duration": info.get("duration"),
+            "thumbnail": info.get("thumbnail"),
+        }
