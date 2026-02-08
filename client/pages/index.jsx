@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import Head from "next/head";
+import ChordDiagram from "../components/ChordDiagram";
 
 /**
  * Main page component for the chord sheet generator.
@@ -25,6 +26,7 @@ export default function Home() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [showDiagram, setShowDiagram] = useState(true);
 
   // Audio playback state
   const audioRef = useRef(null);
@@ -365,6 +367,18 @@ export default function Home() {
             </label>
           </div>
 
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={showDiagram}
+                onChange={(e) => setShowDiagram(e.target.checked)}
+                style={{ width: 16, height: 16, cursor: "pointer" }}
+              />
+              <b>Chord Diagram</b>
+            </label>
+          </div>
+
           <button
             onClick={analyzeYoutube}
             disabled={!ytUrl || loading}
@@ -569,6 +583,19 @@ export default function Home() {
                   marginLeft: 8,
                 }}
               >
+                {/* Chord diagram */}
+                {showDiagram && currentChord && currentChord.label !== "N" && (
+                  <div
+                    style={{
+                      background: "rgba(255,255,255,0.8)",
+                      borderRadius: 8,
+                      padding: 4,
+                    }}
+                  >
+                    <ChordDiagram chord={currentChord.label} size={70} />
+                  </div>
+                )}
+
                 {/* Current chord */}
                 <div style={{ textAlign: "center", minWidth: 70 }}>
                   <div style={{ fontSize: 9, color: "#666", textTransform: "uppercase", letterSpacing: 0.5 }}>
