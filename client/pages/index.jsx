@@ -238,9 +238,10 @@ export default function Home() {
         margin: "24px auto",
         fontFamily: "system-ui",
         padding: "0 16px",
+        textAlign: "center",
       }}
     >
-      <h1>Chord Sheet Generator</h1>
+      <h1>ZorKi - Get me Chords</h1>
 
       {/* Input section: YouTube URL and settings */}
       <div
@@ -704,11 +705,15 @@ export default function Home() {
                         fontSize: width > 6 ? 12 : 10,
                         fontWeight: 600,
                         color: "#fff",
-                        textShadow: "0 1px 2px rgba(0,0,0,0.3)",
+                        textShadow: "0 1px 2px rgba(0,0,0,0.4)",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
-                        padding: "0 2px",
+                        padding: "2px 4px",
+                        background: "rgba(0,0,0,0.25)",
+                        borderRadius: 3,
+                        position: "relative",
+                        zIndex: 10,
                       }}
                     >
                       {chord.label}
@@ -942,11 +947,15 @@ export default function Home() {
                                   fontSize: width > 10 ? 12 : width > 4 ? 10 : 7,
                                   fontWeight: 700,
                                   color: isN ? "#999" : "#fff",
-                                  textShadow: isN ? "none" : "0 1px 2px rgba(0,0,0,0.3)",
+                                  textShadow: isN ? "none" : "0 1px 2px rgba(0,0,0,0.4)",
                                   overflow: "hidden",
                                   textOverflow: "ellipsis",
                                   whiteSpace: "nowrap",
-                                  padding: "0 4px",
+                                  padding: "2px 6px",
+                                  background: isN ? "transparent" : "rgba(0,0,0,0.25)",
+                                  borderRadius: 3,
+                                  position: "relative",
+                                  zIndex: 10,
                                 }}
                               >
                                 {chord.label}
