@@ -7,3 +7,4 @@ vamp
 librosa
 scipy
 yt-dlp
+requests

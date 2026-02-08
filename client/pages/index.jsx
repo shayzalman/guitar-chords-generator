@@ -19,6 +19,7 @@ export default function Home() {
 
   const [lyricsText, setLyricsText] = useState("");
   const [lrcText, setLrcText] = useState("");
+  const [fetchingLyrics, setFetchingLyrics] = useState(false);
 
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -163,6 +164,43 @@ export default function Home() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  /**
+   * Fetch lyrics from LRCLIB based on song title and artist.
+   */
+  async function fetchLyrics() {
+    if (!meta?.title) return;
+
+    setFetchingLyrics(true);
+    try {
+      const params = new URLSearchParams({
+        track: meta.title,
+        artist: meta.author_name || "",
+      });
+
+      const r = await fetch(`http://localhost:4433/api/fetch-lyrics?${params}`);
+      const j = await r.json();
+
+      if (j.found) {
+        if (j.plain_lyrics && !lyricsText) {
+          setLyricsText(j.plain_lyrics);
+        }
+        if (j.lrc_lyrics && !lrcText) {
+          setLrcText(j.lrc_lyrics);
+        }
+        if (!j.plain_lyrics && !j.lrc_lyrics) {
+          alert("Lyrics found but empty. Try a different search.");
+        }
+      } else {
+        alert("No lyrics found for this song.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to fetch lyrics. Is the server running?");
+    } finally {
+      setFetchingLyrics(false);
     }
   }
 
@@ -368,11 +406,29 @@ export default function Home() {
           marginBottom: 16,
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
           <h3 style={{ margin: 0 }}>Lyrics (optional)</h3>
-          <span style={{ fontSize: 12, color: "#666" }}>
-            Lyrics are saved with the song
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button
+              onClick={fetchLyrics}
+              disabled={!meta?.title || fetchingLyrics}
+              style={{
+                background: meta?.title && !fetchingLyrics ? "#1976D2" : "#ccc",
+                color: "white",
+                border: "none",
+                padding: "8px 16px",
+                borderRadius: 4,
+                cursor: meta?.title && !fetchingLyrics ? "pointer" : "not-allowed",
+                fontSize: 13,
+                fontWeight: 500,
+              }}
+            >
+              {fetchingLyrics ? "Fetching..." : "Fetch Lyrics"}
+            </button>
+            <span style={{ fontSize: 12, color: "#666" }}>
+              Lyrics are saved with the song
+            </span>
+          </div>
         </div>
         <div
           style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}

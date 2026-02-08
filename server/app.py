@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -10,6 +10,7 @@ from chordino import run_chordino, postprocess_chords
 from lyrics_align import align_chords_to_lrc, build_chord_sheet_lines
 from beat_detection import detect_beats
 from youtube_utils import download_youtube_audio, extract_video_id
+from lyrics_fetch import fetch_lyrics
 
 
 app = FastAPI()
@@ -100,7 +101,21 @@ async def analyze(
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "1.2", "features": ["analyze", "analyze-youtube", "beat-detection"]}
+    return {"status": "ok", "version": "1.3", "features": ["analyze", "analyze-youtube", "beat-detection", "fetch-lyrics"]}
+
+
+@app.get("/api/fetch-lyrics")
+async def api_fetch_lyrics(
+    track: str = Query(..., description="Song title"),
+    artist: str = Query("", description="Artist name (optional but recommended)"),
+):
+    """Fetch lyrics from LRCLIB for a given track and artist.
+
+    Returns both plain text lyrics and synced LRC lyrics if available.
+    LRCLIB is a free, open lyrics database - no API key required.
+    """
+    result = fetch_lyrics(track, artist)
+    return result
 
 
 @app.post("/api/analyze-youtube")
