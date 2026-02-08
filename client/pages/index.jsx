@@ -346,6 +346,18 @@ export default function Home() {
             </label>
           </div>
 
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={autoScroll}
+                onChange={(e) => setAutoScroll(e.target.checked)}
+                style={{ width: 16, height: 16, cursor: "pointer" }}
+              />
+              <b>Auto-scroll</b>
+            </label>
+          </div>
+
           <button
             onClick={analyzeYoutube}
             disabled={!ytUrl || loading}
