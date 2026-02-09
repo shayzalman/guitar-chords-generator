@@ -20,6 +20,9 @@ app = FastAPI()
 DOWNLOADS_DIR = "downloads"
 os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 
+# Fetch YouTube cookies from GCS on startup
+gcs_storage.fetch_cookies(os.path.join(os.path.dirname(__file__), "cookies.txt"))
+
 # Mount downloads directory for static serving
 app.mount("/downloads", StaticFiles(directory=DOWNLOADS_DIR), name="downloads")
 

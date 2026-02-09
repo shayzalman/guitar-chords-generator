@@ -1,6 +1,9 @@
 import os
 import io
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 GCS_BUCKET = os.environ.get("GCS_BUCKET")
 
@@ -17,6 +20,20 @@ def _get_bucket():
         _client = storage.Client()
         _bucket = _client.bucket(GCS_BUCKET)
     return _bucket
+
+
+def fetch_cookies(dest_path="cookies.txt"):
+    """Download cookies.txt from the bucket root if it exists."""
+    bucket = _get_bucket()
+    if not bucket:
+        return False
+    blob = bucket.blob("cookies.txt")
+    if not blob.exists():
+        logger.info("No cookies.txt found in GCS bucket")
+        return False
+    blob.download_to_filename(dest_path)
+    logger.info("Downloaded cookies.txt from GCS bucket")
+    return True
 
 
 def is_enabled():
