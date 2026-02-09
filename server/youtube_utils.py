@@ -1,7 +1,10 @@
 import yt_dlp
 import os
 import re
+import logging
 from urllib.parse import urlparse, parse_qs
+
+logger = logging.getLogger(__name__)
 
 
 def extract_video_id(url: str) -> str:
@@ -64,14 +67,20 @@ def download_youtube_audio(url: str, output_dir: str) -> dict:
         'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
         'quiet': True,
         'no_warnings': True,
+        # Use alternative player clients to bypass bot detection on datacenter IPs
+        'extractor_args': {'youtube': {'player_client': ['web_creator', 'mediaconnect']}},
     }
 
     # Use cookies if available to bypass bot detection
     cookie_file = os.path.join(os.path.dirname(__file__), 'cookies.txt')
     if os.path.exists(cookie_file):
         ydl_opts['cookiefile'] = cookie_file
+        logger.info("Using cookies from %s", cookie_file)
     elif os.path.exists('cookies.txt'):
         ydl_opts['cookiefile'] = 'cookies.txt'
+        logger.info("Using cookies from cookies.txt")
+    else:
+        logger.warning("No cookies.txt found — YouTube may block requests from datacenter IPs")
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)

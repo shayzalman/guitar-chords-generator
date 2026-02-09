@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import Head from "next/head";
 import ChordDiagram from "../components/ChordDiagram";
+import styles from "../styles/Home.module.css";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://zork-gtr-chrd-977374189487.me-west1.run.app";
 
@@ -293,145 +294,124 @@ export default function Home() {
       >
         <h1>ZorKi - Get me Chords</h1>
 
-      {/* Input section: YouTube URL and settings */}
-      <div
-        style={{
-          padding: 16,
-          border: "1px solid #ddd",
-          borderRadius: 12,
-          marginBottom: 24,
-        }}
-      >
-        <h3>YouTube URL</h3>
-        <input
-          value={ytUrl}
-          onChange={(e) => setYtUrl(e.target.value)}
-          placeholder="https://www.youtube.com/watch?v=..."
-          style={{ width: "100%", padding: 10, boxSizing: "border-box", marginBottom: 12 }}
-        />
+        {/* Input section: YouTube URL and settings */}
+        <div className={styles.settingsForm}>
+          <h3>YouTube URL</h3>
+          <input
+            value={ytUrl}
+            onChange={(e) => setYtUrl(e.target.value)}
+            placeholder="https://www.youtube.com/watch?v=..."
+            className={styles.ytUrlInput}
+          />
 
-        {/* Settings row */}
-        <div
-          style={{
-            display: "flex",
-            gap: 24,
-            alignItems: "center",
-            flexWrap: "wrap",
-            marginBottom: 12,
-          }}
-        >
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <b>Transpose</b>
-            <button
-              onClick={() => setTranspose((t) => t - 1)}
-              style={{ padding: "4px 10px", cursor: "pointer" }}
-            >
-              -½
-            </button>
-            <div style={{ width: 40, textAlign: "center", fontWeight: 600 }}>{transpose}</div>
-            <button
-              onClick={() => setTranspose((t) => t + 1)}
-              style={{ padding: "4px 10px", cursor: "pointer" }}
-            >
-              +½
-            </button>
-          </div>
-
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <b>Mode</b>
-            <label style={{ marginLeft: 4 }}>
-              <input
-                type="radio"
-                checked={mode === "simple"}
-                onChange={() => setMode("simple")}
-              />
-              Simple
-            </label>
-            <label style={{ marginLeft: 8 }}>
-              <input
-                type="radio"
-                checked={mode === "full"}
-                onChange={() => setMode("full")}
-              />
-              Full
-            </label>
-          </div>
-
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={autoScroll}
-                onChange={(e) => setAutoScroll(e.target.checked)}
-                style={{ width: 16, height: 16, cursor: "pointer" }}
-              />
-              <b>Auto-scroll</b>
-            </label>
-          </div>
-
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={showDiagram}
-                onChange={(e) => setShowDiagram(e.target.checked)}
-                style={{ width: 16, height: 16, cursor: "pointer" }}
-              />
-              <b>Chord Diagram</b>
-            </label>
-          </div>
-
-          <button
-            onClick={analyzeYoutube}
-            disabled={!ytUrl || loading}
-            style={{
-              background: "#f44336",
-              color: "white",
-              border: "none",
-              padding: "10px 20px",
-              borderRadius: 4,
-              cursor: ytUrl && !loading ? "pointer" : "not-allowed",
-              fontWeight: 600,
-            }}
-          >
-            {loading ? "Processing..." : "Analyze"}
-          </button>
-        </div>
-
-        {meta && (
-          <div
-            style={{
-              display: "flex",
-              gap: 16,
-              alignItems: "center",
-              marginTop: 12,
-              padding: 12,
-              background: "#f9f9f9",
-              borderRadius: 8,
-            }}
-          >
-            {meta.thumbnail_url && (
-              <img
-                src={meta.thumbnail_url}
-                alt="Video thumbnail"
-                style={{
-                  width: 120,
-                  borderRadius: 8,
-                }}
-              />
-            )}
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 16 }}>{meta.title}</div>
-              <div style={{ color: "#666" }}>{meta.author_name}</div>
-              {result?.meta?.cached && (
-                <div style={{ color: "#4CAF50", fontSize: 12, marginTop: 4 }}>
-                  Loaded from cache
-                </div>
-              )}
+          {/* Settings row */}
+          <div className={styles.settingsRow}>
+            <div className={styles.settingGroup}>
+              <b>Transpose</b>
+              <button
+                onClick={() => setTranspose((t) => t - 1)}
+                className={styles.transposeButton}
+              >
+                -½
+              </button>
+              <div className={styles.transposeValue}>{transpose}</div>
+              <button
+                onClick={() => setTranspose((t) => t + 1)}
+                className={styles.transposeButton}
+              >
+                +½
+              </button>
             </div>
+
+            <div className={styles.settingGroup}>
+              <b>Mode</b>
+              <label className={styles.radioLabel}>
+                <input
+                  type="radio"
+                  checked={mode === "simple"}
+                  onChange={() => setMode("simple")}
+                  className={styles.radioInput}
+                />
+                Simple
+              </label>
+              <label className={styles.radioLabel}>
+                <input
+                  type="radio"
+                  checked={mode === "full"}
+                  onChange={() => setMode("full")}
+                  className={styles.radioInput}
+                />
+                Full
+              </label>
+            </div>
+
+            <div className={styles.settingGroup}>
+              <label className={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={autoScroll}
+                  onChange={(e) => setAutoScroll(e.target.checked)}
+                  className={styles.checkboxInput}
+                />
+                <b>Auto-scroll</b>
+              </label>
+            </div>
+
+            <div className={styles.settingGroup}>
+              <label className={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={showDiagram}
+                  onChange={(e) => setShowDiagram(e.target.checked)}
+                  className={styles.checkboxInput}
+                />
+                <b>Chord Diagram</b>
+              </label>
+            </div>
+
+            <button
+              onClick={analyzeYoutube}
+              disabled={!ytUrl || loading}
+              className={styles.analyzeButton}
+            >
+              {loading ? "Processing..." : "Analyze"}
+            </button>
           </div>
-        )}
-      </div>
+
+          {meta && (
+            <div
+              style={{
+                display: "flex",
+                gap: 16,
+                alignItems: "center",
+                marginTop: 12,
+                padding: 12,
+                background: "#f9f9f9",
+                borderRadius: 8,
+              }}
+            >
+              {meta.thumbnail_url && (
+                <img
+                  src={meta.thumbnail_url}
+                  alt="Video thumbnail"
+                  style={{
+                    width: 120,
+                    borderRadius: 8,
+                  }}
+                />
+              )}
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 16 }}>{meta.title}</div>
+                <div style={{ color: "#666" }}>{meta.author_name}</div>
+                {result?.meta?.cached && (
+                  <div style={{ color: "#4CAF50", fontSize: 12, marginTop: 4 }}>
+                    Loaded from cache
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
       {/* Lyrics input */}
       <div
