@@ -58,7 +58,7 @@ def download_youtube_audio(url: str, output_dir: str) -> dict:
     url = clean_youtube_url(url)
 
     ydl_opts = {
-        'format': 'bestaudio/best',
+        'format': 'bestaudio*/best',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
