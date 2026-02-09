@@ -35,4 +35,8 @@ RUN pip install --no-cache-dir numpy && pip install --no-cache-dir -r requiremen
 RUN mkdir -p /app/downloads && chmod 777 /app/downloads
 
 COPY . .
+
+# Check if cookies.txt exists in the build context and ensure it's readable
+RUN if [ -f cookies.txt ]; then chmod 644 cookies.txt; fi
+
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]

@@ -6,6 +6,6 @@ numpy
 vamp
 librosa
 scipy
-yt-dlp
+yt-dlp>=2025.01.26
 requests
 google-cloud-storage

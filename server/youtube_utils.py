@@ -66,6 +66,13 @@ def download_youtube_audio(url: str, output_dir: str) -> dict:
         'no_warnings': True,
     }
 
+    # Use cookies if available to bypass bot detection
+    cookie_file = os.path.join(os.path.dirname(__file__), 'cookies.txt')
+    if os.path.exists(cookie_file):
+        ydl_opts['cookiefile'] = cookie_file
+    elif os.path.exists('cookies.txt'):
+        ydl_opts['cookiefile'] = 'cookies.txt'
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         # yt-dlp might change the extension to mp3 because of the postprocessor
