@@ -36,6 +36,42 @@ def fetch_cookies(dest_path="cookies.txt"):
     return True
 
 
+def fetch_ytdlp_cache(local_cache_dir):
+    """Download the yt-dlp OAuth cache directory from GCS."""
+    bucket = _get_bucket()
+    if not bucket:
+        return False
+    blobs = list(bucket.list_blobs(prefix="ytdlp-cache/"))
+    if not blobs:
+        logger.info("No yt-dlp cache found in GCS bucket")
+        return False
+    for blob in blobs:
+        rel_path = blob.name[len("ytdlp-cache/"):]
+        if not rel_path:
+            continue
+        local_path = os.path.join(local_cache_dir, rel_path)
+        os.makedirs(os.path.dirname(local_path), exist_ok=True)
+        blob.download_to_filename(local_path)
+    logger.info("Downloaded yt-dlp cache from GCS bucket")
+    return True
+
+
+def upload_ytdlp_cache(local_cache_dir):
+    """Upload the yt-dlp OAuth cache directory to GCS (persists refreshed tokens)."""
+    bucket = _get_bucket()
+    if not bucket:
+        return
+    if not os.path.isdir(local_cache_dir):
+        return
+    for root, _dirs, files in os.walk(local_cache_dir):
+        for f in files:
+            local_path = os.path.join(root, f)
+            rel_path = os.path.relpath(local_path, local_cache_dir)
+            blob = bucket.blob(f"ytdlp-cache/{rel_path}")
+            blob.upload_from_filename(local_path)
+    logger.info("Uploaded yt-dlp cache to GCS bucket")
+
+
 def is_enabled():
     return bool(GCS_BUCKET)
 

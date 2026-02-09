@@ -20,7 +20,7 @@ app = FastAPI()
 DOWNLOADS_DIR = "downloads"
 os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 
-# Fetch YouTube cookies from GCS on startup (skip in dev)
+# Fetch YouTube auth from GCS on startup (skip in dev)
 if os.environ.get("ENV") != "dev":
     gcs_storage.fetch_cookies(os.path.join(os.path.dirname(__file__), "cookies.txt"))
 
