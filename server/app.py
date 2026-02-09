@@ -1,7 +1,7 @@
-from fastapi import FastAPI, UploadFile, File, Form, Query
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 import tempfile
 import os
 import json
@@ -11,6 +11,7 @@ from lyrics_align import align_chords_to_lrc, build_chord_sheet_lines
 from beat_detection import detect_beats
 from youtube_utils import download_youtube_audio, extract_video_id, clean_youtube_url
 from lyrics_fetch import fetch_lyrics
+import gcs_storage
 
 
 app = FastAPI()
@@ -119,6 +120,30 @@ async def api_fetch_lyrics(
     return result
 
 
+@app.get("/api/audio/{video_id}")
+async def serve_audio(video_id: str):
+    """Serve cached audio file from local disk or GCS bucket."""
+    # Try local first
+    job_dir = os.path.join(DOWNLOADS_DIR, video_id)
+    if os.path.isdir(job_dir):
+        mp3_files = [f for f in os.listdir(job_dir) if f.endswith(".mp3")]
+        if mp3_files:
+            return FileResponse(
+                os.path.join(job_dir, mp3_files[0]),
+                media_type="audio/mpeg",
+                filename=mp3_files[0],
+            )
+    # Fall back to GCS
+    audio_bytes, filename = gcs_storage.stream_audio(video_id)
+    if audio_bytes:
+        return StreamingResponse(
+            audio_bytes,
+            media_type="audio/mpeg",
+            headers={"Content-Disposition": f'inline; filename="{filename}"'},
+        )
+    raise HTTPException(status_code=404, detail="Audio not found")
+
+
 @app.post("/api/analyze-youtube")
 async def analyze_youtube(
     youtube_url: str = Form(...),
@@ -144,12 +169,20 @@ async def analyze_youtube(
     job_dir = os.path.join(DOWNLOADS_DIR, video_id)
     cache_file = os.path.join(job_dir, "metadata.json")
 
-    # Check if we have cached data for this video
+    # Check local cache first, then GCS
+    cached_data = None
     if os.path.exists(cache_file):
         try:
             with open(cache_file, "r", encoding="utf-8") as f:
                 cached_data = json.load(f)
+        except (json.JSONDecodeError, KeyError):
+            cached_data = None
 
+    if cached_data is None:
+        cached_data = gcs_storage.load_json(video_id)
+
+    if cached_data is not None:
+        try:
             # Use provided lyrics or fall back to cached lyrics
             used_lyrics_text = lyrics_text.strip() if lyrics_text.strip() else cached_data.get("lyrics_text", "")
             used_lrc_text = lrc_text.strip() if lrc_text.strip() else cached_data.get("lrc_text", "")
@@ -160,8 +193,10 @@ async def analyze_youtube(
                     cached_data["lyrics_text"] = lyrics_text.strip()
                 if lrc_text.strip():
                     cached_data["lrc_text"] = lrc_text.strip()
+                os.makedirs(job_dir, exist_ok=True)
                 with open(cache_file, "w", encoding="utf-8") as f:
                     json.dump(cached_data, f, ensure_ascii=False, indent=2)
+                gcs_storage.save_json(video_id, cached_data)
 
             # Re-apply transpose and mode settings (these can change per request)
             chords = cached_data.get("chords_raw", cached_data.get("chords", []))
@@ -180,13 +215,6 @@ async def analyze_youtube(
                 mode=mode,
             )
 
-            # Find the MP3 file in the cache directory
-            mp3_files = [f for f in os.listdir(job_dir) if f.endswith(".mp3")]
-            if mp3_files:
-                audio_url = f"/downloads/{video_id}/{mp3_files[0]}"
-            else:
-                audio_url = cached_data.get("meta", {}).get("audio_url", "")
-
             return {
                 "meta": {
                     "title": cached_data.get("meta", {}).get("title", ""),
@@ -194,7 +222,7 @@ async def analyze_youtube(
                     "transpose": transpose,
                     "mode": mode,
                     "youtube_url": youtube_url,
-                    "audio_url": audio_url,
+                    "audio_url": f"/api/audio/{video_id}",
                     "thumbnail": cached_data.get("meta", {}).get("thumbnail"),
                     "duration": cached_data.get("meta", {}).get("duration"),
                     "cached": True,
@@ -206,7 +234,7 @@ async def analyze_youtube(
                 "lyrics_text": used_lyrics_text,
                 "lrc_text": used_lrc_text,
             }
-        except (json.JSONDecodeError, KeyError) as e:
+        except KeyError:
             # Cache is corrupted, reprocess
             pass
 
@@ -253,7 +281,7 @@ async def analyze_youtube(
         )
 
         filename = os.path.basename(mp3_path)
-        audio_url = f"/downloads/{video_id}/{filename}"
+        audio_url = f"/api/audio/{video_id}"
 
         # Save cache data (raw chords without transpose/mode applied)
         cache_data = {
@@ -274,6 +302,10 @@ async def analyze_youtube(
 
         with open(cache_file, "w", encoding="utf-8") as f:
             json.dump(cache_data, f, ensure_ascii=False, indent=2)
+
+        # Persist to GCS bucket
+        gcs_storage.save_json(video_id, cache_data)
+        gcs_storage.upload_file(video_id, mp3_path)
 
         return {
             "meta": {
