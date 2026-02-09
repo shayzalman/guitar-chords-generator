@@ -22,10 +22,11 @@ os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 # Mount downloads directory for static serving
 app.mount("/downloads", StaticFiles(directory=DOWNLOADS_DIR), name="downloads")
 
-# Allow CORS for local development
+# Allow CORS for local development and Cloud Run
+CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:3000,http://localhost:3001")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_origins=[o.strip() for o in CORS_ORIGINS.split(",")],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

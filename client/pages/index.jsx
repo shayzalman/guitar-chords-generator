@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import Head from "next/head";
 import ChordDiagram from "../components/ChordDiagram";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4433";
+
 /**
  * Main page component for the chord sheet generator.
  *
@@ -129,7 +131,7 @@ export default function Home() {
     fd.append("lrc_text", lrcText);
 
     try {
-      const r = await fetch("http://localhost:4433/api/analyze-youtube", {
+      const r = await fetch(`${API_BASE}/api/analyze-youtube`, {
         method: "POST",
         body: fd,
       });
@@ -153,7 +155,7 @@ export default function Home() {
         // Handle both relative and absolute URLs
         const finalAudioUrl = j.meta.audio_url.startsWith("http")
           ? j.meta.audio_url
-          : `http://localhost:4433${j.meta.audio_url}`;
+          : `${API_BASE}${j.meta.audio_url}`;
         setAudioUrl(finalAudioUrl);
       }
 
@@ -184,7 +186,7 @@ export default function Home() {
         artist: meta.author_name || "",
       });
 
-      const r = await fetch(`http://localhost:4433/api/fetch-lyrics?${params}`);
+      const r = await fetch(`${API_BASE}/api/fetch-lyrics?${params}`);
       const j = await r.json();
 
       if (j.found) {
