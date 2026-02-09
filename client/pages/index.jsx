@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import Head from "next/head";
 import ChordDiagram from "../components/ChordDiagram";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4433";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://zork-gtr-chrd-977374189487.me-west1.run.app";
 
 /**
  * Main page component for the chord sheet generator.
