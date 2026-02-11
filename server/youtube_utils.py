@@ -68,6 +68,8 @@ def download_youtube_audio(url: str, output_dir: str) -> dict:
         'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
         'quiet': True,
         'no_warnings': True,
+        # Download JS challenge solver for Deno (required by YouTube)
+        'remote_components': ['ejs:github'],
     }
 
     # In dev, use browser cookies if available
