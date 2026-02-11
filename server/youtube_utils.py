@@ -70,10 +70,7 @@ def download_youtube_audio(url: str, output_dir: str) -> dict:
         'no_warnings': True,
     }
 
-    if is_prod:
-        ydl_opts['extractor_args'] = {'youtube': {'player_client': ['web_creator', 'mweb', 'ios']}}
-
-    # Use cookies only in dev (browser cookies don't work on Cloud Run due to IP mismatch)
+    # In dev, use browser cookies if available
     if not is_prod:
         cookie_file = os.path.join(os.path.dirname(__file__), 'cookies.txt')
         if os.path.exists(cookie_file):
@@ -88,14 +85,14 @@ def download_youtube_audio(url: str, output_dir: str) -> dict:
         # but after postprocessing it will be .mp3
         base, _ = os.path.splitext(filename)
         mp3_path = base + ".mp3"
-        
+
         # Ensure the file actually exists (yt-dlp can be tricky with filenames)
         if not os.path.exists(mp3_path):
              # Try to find any mp3 file in the output_dir that was just created
              files = [f for f in os.listdir(output_dir) if f.endswith(".mp3")]
              if files:
                  mp3_path = os.path.join(output_dir, files[0])
-        
+
         return {
             "path": mp3_path,
             "video_id": info.get("id", extract_video_id(url)),

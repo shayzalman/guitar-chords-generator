@@ -6,6 +6,7 @@ numpy
 vamp
 librosa
 scipy
-yt-dlp>=2025.01.26
+yt-dlp>=2025.05.22
+bgutil-ytdlp-pot-provider
 requests
 google-cloud-storage

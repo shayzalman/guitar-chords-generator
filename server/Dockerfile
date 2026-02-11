@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ca-certificates \
     curl \
+    unzip \
     xz-utils \
     bzip2 \
     build-essential \
@@ -17,8 +18,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libboost-all-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# --- Install Deno (JS runtime required by yt-dlp for YouTube) ---
+RUN curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh
+
+# --- Install Node.js 20 (required by bgutil PO token server) ---
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- Build bgutil PO token server ---
+RUN git clone --depth=1 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git /opt/bgutil \
+    && cd /opt/bgutil/server \
+    && npm install \
+    && npx tsc \
+    && rm -rf /opt/bgutil/.git
+
 # --- Build and install NNLS-Chroma/Chordino Vamp plugin ---
-# Source: https://github.com/c4dm/nnls-chroma  [oai_citation:4‡GitHub](https://github.com/c4dm/nnls-chroma?utm_source=chatgpt.com)
+# Source: https://github.com/c4dm/nnls-chroma
 RUN git clone --depth=1 https://github.com/c4dm/nnls-chroma.git /tmp/nnls-chroma \
  && mkdir -p /usr/local/lib/vamp \
  && cd /tmp/nnls-chroma \
@@ -39,4 +55,7 @@ COPY . .
 # Check if cookies.txt exists in the build context and ensure it's readable
 RUN if [ -f cookies.txt ]; then chmod 644 cookies.txt; fi
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]
+COPY start.sh .
+RUN chmod +x start.sh
+
+CMD ["./start.sh"]
