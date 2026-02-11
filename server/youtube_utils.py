@@ -59,7 +59,7 @@ def download_youtube_audio(url: str, output_dir: str) -> dict:
     is_prod = os.environ.get("ENV") != "dev"
 
     ydl_opts = {
-        'format': 'bestaudio*/best',
+        'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
@@ -71,13 +71,14 @@ def download_youtube_audio(url: str, output_dir: str) -> dict:
     }
 
     if is_prod:
-        ydl_opts['extractor_args'] = {'youtube': {'player_client': ['web_creator', 'mediaconnect']}}
+        ydl_opts['extractor_args'] = {'youtube': {'player_client': ['web_creator', 'mweb', 'ios']}}
 
-    # Use cookies if available to bypass bot detection
-    cookie_file = os.path.join(os.path.dirname(__file__), 'cookies.txt')
-    if os.path.exists(cookie_file):
-        ydl_opts['cookiefile'] = cookie_file
-        logger.info("Using cookies from %s", cookie_file)
+    # Use cookies only in dev (browser cookies don't work on Cloud Run due to IP mismatch)
+    if not is_prod:
+        cookie_file = os.path.join(os.path.dirname(__file__), 'cookies.txt')
+        if os.path.exists(cookie_file):
+            ydl_opts['cookiefile'] = cookie_file
+            logger.info("Using cookies from %s", cookie_file)
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
