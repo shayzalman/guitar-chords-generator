@@ -107,7 +107,45 @@ async def analyze(
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "1.3", "features": ["analyze", "analyze-youtube", "beat-detection", "fetch-lyrics"]}
+    import shutil
+    import urllib.request
+
+    checks = {}
+
+    # Check PO token server
+    try:
+        req = urllib.request.urlopen("http://127.0.0.1:4416/ping", timeout=3)
+        checks["pot_server"] = req.read().decode()
+    except Exception as e:
+        checks["pot_server"] = f"UNREACHABLE: {e}"
+
+    # Check Deno
+    deno_path = shutil.which("deno")
+    checks["deno"] = deno_path or "NOT FOUND"
+
+    # Check yt-dlp version + plugins
+    try:
+        import yt_dlp
+        checks["yt_dlp_version"] = yt_dlp.version.__version__
+    except Exception as e:
+        checks["yt_dlp_version"] = f"ERROR: {e}"
+
+    try:
+        result = subprocess.run(
+            ["yt-dlp", "--print", "%(extractor)s", "--list-plugins"],
+            capture_output=True, text=True, timeout=5
+        )
+        # list-plugins might not exist, try verbose approach
+        result2 = subprocess.run(
+            ["yt-dlp", "--verbose", "--version"],
+            capture_output=True, text=True, timeout=5
+        )
+        plugin_lines = [l for l in result2.stderr.splitlines() if "plugin" in l.lower() or "pot" in l.lower()]
+        checks["plugins"] = plugin_lines or result2.stdout.strip()
+    except Exception as e:
+        checks["plugins"] = f"ERROR: {e}"
+
+    return {"status": "ok", "version": "1.4", "checks": checks}
 
 
 @app.get("/api/fetch-lyrics")
